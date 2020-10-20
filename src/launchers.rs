@@ -2,6 +2,7 @@
 pub mod config {
     use serde::{Deserialize, Serialize};
     use std::collections::HashMap;
+    use std::string::ToString;
 
     /// Config:
     /// This enum is used to be directly mapped to launchd.plist XML.
@@ -26,14 +27,38 @@ pub mod config {
             }
         }
 
-        fn add_config(mut self, config: Config) -> Configuration {
+        /// add_config() function <i>add</i> new configuration or <i>replace</i> old configuration.
+        pub fn add_config(mut self, config: Config) -> Configuration {
+            let conf_name = config.to_string();
+            let configuration = &mut self.configuration;
+            for conf in configuration {
+                if conf_name == conf.to_string() {
+                    *conf = config;
+                    return self;
+                }
+            }
             self.configuration.push(config);
             self
         }
+
+        pub fn remove_config(mut self, config_name: &str) -> Configuration {
+            self.configuration = self.configuration.into_iter()
+                .filter(|c| {&(*c.to_string()) != config_name})
+                .collect();
+            self
+        }
+
+        pub fn from_yaml(yaml: &str) -> serde_yaml::Result<Configuration> {
+            serde_yaml::from_str::<Configuration>(yaml)
+        }
+
+        pub fn to_yaml(&self) -> serde_yaml::Result<String> {
+            serde_yaml::to_string(self)
+        }
     }
 
-    #[derive(Deserialize, Serialize, PartialEq, Debug)]
-    enum Config {
+    #[derive(Deserialize, Serialize, PartialEq, Debug, Display)]
+    pub enum Config {
         ProgramArguments(Option<Vec<String>>),
         EnvironmentVariables(Option<HashMap<String, String>>),
         KeepAlive(Option<Vec<AliveCondition>>),
@@ -46,7 +71,13 @@ pub mod config {
         StandardOutPath(Option<String>),
         StandardErrorPath(Option<String>),
         SoftResourceLimit(Option<Vec<Limit>>),
-        HardResourceLimits(Option<Vec<Limit>>),
+        HardResourceLimits(Option<Vec<Limit>>)
+    }
+
+    impl Config {
+        pub fn from_yaml(yaml: &str) -> serde_yaml::Result<Config> {
+            serde_yaml::from_str::<Config>(yaml)
+        }
     }
 
     /// AliveCondition
@@ -71,7 +102,7 @@ pub mod config {
     ///
     /// </ul>
     #[derive(Deserialize, Serialize, PartialEq, Debug)]
-    enum AliveCondition {
+    pub enum AliveCondition {
         Always,
         SuccessfulExit(bool),
         OtherJobEnabled(HashMap<String, bool>),
@@ -94,7 +125,7 @@ pub mod config {
     /// The month (1-12) on which this job will be run.</li>
     /// </ul>
     #[derive(Deserialize, Serialize, PartialEq, Debug)]
-    enum CalendarInterval {
+    pub enum CalendarInterval {
         Minute(i32),
         Hour(i32),
         Day(i32),
@@ -142,7 +173,7 @@ pub mod config {
     ///
     /// </ul>
     #[derive(Deserialize, Serialize, PartialEq, Debug)]
-    enum Limit {
+    pub enum Limit {
         Core(i32),
         CPU(i32),
         Data(i32),
@@ -194,16 +225,113 @@ pub mod config {
                 + "      - Minute: 15";
 
             assert_eq!(
-                expected_deserialized,
-                serde_yaml::to_string(&test_config).unwrap()
+                test_config.to_yaml().unwrap(),
+                expected_deserialized
             );
 
             assert_eq!(
+                Configuration::from_yaml(&expected_deserialized[..]).unwrap(),
                 test_config,
-                serde_yaml::from_str::<Configuration>(&expected_deserialized[..]).unwrap()
+            );
+        }
+
+        #[test]
+        fn update_test_config() {
+            let test_config = Configuration::new("com.tasker.test_task", "/bin/python")
+                .add_config(Config::StandardOutPath(Some(
+                    "standard_in".parse().unwrap(),
+                )))
+                .add_config(Config::StandardOutPath(Some(
+                    "standard_in_new".parse().unwrap(),
+                )));
+
+            let expected_deserialized = String::new()
+                + "---\n"
+                + "label: com.tasker.test_task\n"
+                + "program: /bin/python\n"
+                + "configuration:\n"
+                + "  - StandardOutPath: standard_in_new";
+
+            assert_eq!(
+                test_config.to_yaml().unwrap(),
+                expected_deserialized
+            );
+
+            assert_eq!(
+                Configuration::from_yaml(&expected_deserialized).unwrap(),
+                test_config,
+            );
+        }
+
+        #[test]
+        fn update_test_config_from_yaml() {
+            let mut test_config = Configuration::new("com.tasker.test_task", "/bin/python")
+                .add_config(Config::StandardOutPath(Some(
+                    "standard_in".parse().unwrap(),
+                )));
+
+            let yaml_to_add = String::new()
+                + "---\n"
+                + "StartCalendarInterval:\n"
+                + "  - Hour: 9\n"
+                + "  - Minute: 15";
+
+            let expected_deserialized = String::new()
+                + "---\n"
+                + "label: com.tasker.test_task\n"
+                + "program: /bin/python\n"
+                + "configuration:\n"
+                + "  - StandardOutPath: standard_in\n"
+                + "  - StartCalendarInterval:\n"
+                + "      - Hour: 9\n"
+                + "      - Minute: 15";
+
+            test_config = test_config.add_config(Config::from_yaml(&yaml_to_add).unwrap());
+
+            assert_eq!(
+                test_config.to_yaml().unwrap(),
+                expected_deserialized
+            );
+        }
+
+        #[test]
+        fn test_remove_config() {
+            let test_config = Configuration::new("com.tasker.test_task", "/bin/python")
+                .add_config(Config::StandardOutPath(Some(
+                    "standard_in".parse().unwrap(),
+                )))
+                .add_config(Config::KeepAlive(Some(vec![
+                    AliveCondition::Crashed(true),
+                    AliveCondition::SuccessfulExit(false),
+                ])))
+                .add_config(Config::StartCalendarInterval(Some(vec![
+                    CalendarInterval::Hour(9),
+                    CalendarInterval::Minute(15),
+                ])))
+                .remove_config("KeepAlive");
+
+            let expected_deserialized = String::new()
+                + "---\n"
+                + "label: com.tasker.test_task\n"
+                + "program: /bin/python\n"
+                + "configuration:\n"
+                + "  - StandardOutPath: standard_in\n"
+                + "  - StartCalendarInterval:\n"
+                + "      - Hour: 9\n"
+                + "      - Minute: 15";
+
+            assert_eq!(
+                test_config.to_yaml().unwrap(),
+                expected_deserialized
             );
         }
     }
 }
 
-pub mod launchd {}
+pub mod launchd {
+
+    // use crate::launchers::config;
+
+    // fn get_plist(conf: config::Configuration) -> String {
+    // }
+}
