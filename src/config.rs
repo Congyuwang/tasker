@@ -179,6 +179,7 @@ pub enum Config {
     KeepAlive(AliveCondition),
     RunAtLoad(bool),
     WorkingDirectory(String),
+    RootDirectory(String),
     ExitTimeOut(i64),
     StartInterval(i64),
     StartCalendarInterval(Vec<CalendarInterval>),
@@ -229,6 +230,10 @@ impl Config {
             Config::WorkingDirectory(p) => {
                 let p: String = Config::check_path(p)?;
                 Ok(Config::WorkingDirectory(p))
+            }
+            Config::RootDirectory(p) => {
+                let p: String = Config::check_path(p)?;
+                Ok(Config::RootDirectory(p))
             }
             Config::StandardInPath(p) => {
                 let p: String = Config::check_path(p)?;
