@@ -2,7 +2,7 @@ use std::{io, string};
 
 #[derive(Debug)]
 pub enum Error {
-    YamlError(String),
+    YamlError(serde_yaml::Error),
     ConfigRangeError(String),
     ConfigPathError(String),
     ConfigLabelError(String),
