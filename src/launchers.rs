@@ -1,8 +1,37 @@
+
+static DOMAIN_NAME: &str = "com.tasker.tasks";
+
 /// config module provides general configuration for tasks
 pub mod config {
+    use crate::error::Error;
+    use regex::Regex;
     use serde::{Deserialize, Serialize};
     use std::collections::BTreeMap;
+    use std::path::Path;
     use std::string::ToString;
+    use crate::launchers::DOMAIN_NAME;
+
+    macro_rules! check_range_return_err {
+        ($name: ident, $i: expr, $lo: expr, $hi: expr) => {
+            if $i < $lo || $i > $hi {
+                return Err(Error::ConfigRangeError(format!(
+                    "{} with value {:?} is out of range ({}, {})",
+                    stringify!($name),
+                    $i,
+                    $lo,
+                    $hi
+                )));
+            }
+        };
+    }
+
+    macro_rules! check_option_range_return_err {
+        ($self: ident, $field_name: ident, $lo: expr, $hi: expr) => {
+            if let Some(i) = $self.$field_name {
+                check_range_return_err!($field_name, i, $lo, $hi);
+            }
+        };
+    }
 
     /// Config:
     /// This enum is used to be directly mapped to launchd.plist XML.
@@ -31,6 +60,7 @@ pub mod config {
         }
 
         /// add_config() function <i>add</i> new configuration or <i>replace</i> old configuration.
+        /// This function does not do any checking
         pub fn add_config(mut self, config: Config) -> Configuration {
             let conf_name = config.to_string();
             let configuration = &mut self.configuration;
@@ -45,18 +75,83 @@ pub mod config {
         }
 
         pub fn remove_config(mut self, config_name: &str) -> Configuration {
-            self.configuration = self.configuration.into_iter()
-                .filter(|c| {&(*c.to_string()) != config_name})
+            self.configuration = self
+                .configuration
+                .into_iter()
+                .filter(|c| &(*c.to_string()) != config_name)
                 .collect();
             self
         }
 
-        pub fn from_yaml(yaml: &str) -> serde_yaml::Result<Configuration> {
-            serde_yaml::from_str::<Configuration>(yaml)
+        /// this function does checking, and removes duplicates to keep the last items
+        pub fn from_yaml(yaml: &str) -> Result<Configuration, Error> {
+            let mut config = match serde_yaml::from_str::<Configuration>(yaml) {
+                Ok(config) => config,
+                Err(e) => {
+                    return Err(Error::YamlError(String::from(format!(
+                        "yaml reading error in Configuration: {:?}",
+                        e.to_string()
+                    ))));
+                }
+            }
+            .check_label()?
+            .check_program()?
+            .append_domain();
+
+            let mut new_config = Configuration::new(&config.label, &config.program);
+            for c in config.configuration {
+                new_config = new_config.add_config(c.check()?);
+            }
+            Ok(new_config)
         }
 
         pub fn to_yaml(&self) -> serde_yaml::Result<String> {
-            serde_yaml::to_string(self)
+            let yaml = serde_yaml::to_string(self)?;
+            let mut result = Vec::new();
+            let label_line = String::from("Label: ") + DOMAIN_NAME + ".";
+            for y in yaml.lines() {
+                if y.starts_with(&label_line) {
+                    result.push(y.replace(&label_line, "Label: "));
+                } else {
+                    result.push(String::from(y))
+                }
+            }
+            Ok(result.join("\n"))
+        }
+
+        fn check_program(self) -> Result<Configuration, Error> {
+            let program = Path::new(&self.program);
+            if !program.is_absolute() {
+                return Err(Error::ConfigProgramError(format!(
+                    "program path {} is not an absolute path",
+                    &self.label
+                )));
+            }
+            if !program.is_file() {
+                return Err(Error::ConfigProgramError(format!(
+                    "program {} is not found or not permitted to access",
+                    &self.label
+                )));
+            }
+            Ok(self)
+        }
+
+        fn check_label(self) -> Result<Configuration, Error> {
+            lazy_static! {
+                static ref LabelRegex: Regex = Regex::new("[a-z]+(\\.[a-z]+)*").unwrap();
+            }
+            if !LabelRegex.is_match(&self.label) {
+                return Err(Error::ConfigLabelError(format!(
+                    "{} is not a valid label",
+                    &self.label
+                )));
+            }
+            Ok(self)
+        }
+
+        fn append_domain(mut self) -> Configuration {
+            self.label = String::from(DOMAIN_NAME) + "." + &self.label;
+            self
         }
     }
 
@@ -67,20 +162,85 @@ pub mod config {
         KeepAlive(AliveCondition),
         RunAtLoad(bool),
         WorkingDirectory(String),
-        ExitTimeOut(i32),
-        StartInterval(i32),
+        ExitTimeOut(i64),
+        StartInterval(i64),
         StartCalendarInterval(Vec<CalendarInterval>),
         StandardInPath(String),
         StandardOutPath(String),
         StandardErrorPath(String),
         SoftResourceLimit(ResourceLimit),
-        HardResourceLimits(ResourceLimit)
+        HardResourceLimits(ResourceLimit),
     }
 
     impl Config {
-        pub fn from_yaml(yaml: &str) -> serde_yaml::Result<Config> {
-            serde_yaml::from_str::<Config>(yaml)
+        /// this function does checking
+        pub fn from_yaml(yaml: &str) -> Result<Config, Error> {
+            match serde_yaml::from_str::<Config>(yaml) {
+                Ok(config) => config.check(),
+                Err(e) => Err(Error::YamlError(String::from(format!(
+                    "yaml reading error in Config: {:?}",
+                    e.to_string()
+                )))),
+            }
         }
+
+        fn check(self) -> Result<Config, Error> {
+            match self {
+                Config::SoftResourceLimit(limit) => match limit.check() {
+                    Ok(l) => Ok(Config::SoftResourceLimit(l)),
+                    Err(e) => Err(e),
+                },
+                Config::HardResourceLimits(limit) => match limit.check() {
+                    Ok(l) => Ok(Config::HardResourceLimits(l)),
+                    Err(e) => Err(e),
+                },
+                Config::StartCalendarInterval(calendar) => {
+                    let mut new_cals = Vec::with_capacity(calendar.len());
+                    for cal in calendar {
+                        match cal.check() {
+                            Ok(c) => new_cals.push(c),
+                            Err(e) => return Err(e),
+                        }
+                    }
+                    Ok(Config::StartCalendarInterval(new_cals))
+                }
+                Config::ExitTimeOut(t) => {
+                    check_range_return_err!(ExitTimeOut, t, 0, i64::MAX);
+                    Ok(Config::ExitTimeOut(t))
+                }
+                Config::StartInterval(t) => {
+                    check_range_return_err!(StartInterval, t, 0, i64::MAX);
+                    Ok(Config::StartInterval(t))
+                }
+                Config::WorkingDirectory(p) => {
+                    let p: String = check_path(p)?;
+                    Ok(Config::WorkingDirectory(p))
+                }
+                Config::StandardInPath(p) => {
+                    let p: String = check_path(p)?;
+                    Ok(Config::StandardInPath(p))
+                }
+                Config::StandardOutPath(p) => {
+                    let p: String = check_path(p)?;
+                    Ok(Config::StandardOutPath(p))
+                }
+                Config::StandardErrorPath(p) => {
+                    let p: String = check_path(p)?;
+                    Ok(Config::StandardErrorPath(p))
+                }
+                _ => Ok(self),
+            }
+        }
+    }
+
+    fn check_path(path: String) -> Result<String, Error> {
+        if !Path::new(&path).is_dir() {
+            return Err(Error::ConfigPathError(format!(
+                "{} is not a directory",
+                path
+            )));
+        }
+        Ok(path)
     }
 
     /// AliveCondition
@@ -140,39 +300,37 @@ pub mod config {
     pub struct CalendarInterval {
         #[serde(rename = "Minute")]
         #[serde(skip_serializing_if = "Option::is_none")]
-        minute: Option<i32>,
+        minute: Option<i64>,
         #[serde(rename = "Hour")]
         #[serde(skip_serializing_if = "Option::is_none")]
-        hour: Option<i32>,
+        hour: Option<i64>,
         #[serde(rename = "Day")]
         #[serde(skip_serializing_if = "Option::is_none")]
-        day: Option<i32>,
+        day: Option<i64>,
         #[serde(rename = "Weekday")]
         #[serde(skip_serializing_if = "Option::is_none")]
-        weekday: Option<i32>,
+        weekday: Option<i64>,
         #[serde(rename = "Month")]
         #[serde(skip_serializing_if = "Option::is_none")]
-        month: Option<i32>,
+        month: Option<i64>,
+    }
+
+    impl CalendarInterval {
+        pub fn check(self) -> Result<CalendarInterval, Error> {
+            check_option_range_return_err!(self, minute, 0, 59);
+            check_option_range_return_err!(self, hour, 0, 23);
+            check_option_range_return_err!(self, day, 1, 31);
+            check_option_range_return_err!(self, weekday, 0, 7);
+            check_option_range_return_err!(self, month, 1, 12);
+            Ok(self)
+        }
     }
 
     /// Resource Limit
     /// <ul>
     ///
-    /// <li>Core (integer): <br>
-    /// The largest size (in bytes) core file that may be created.</li>
-    ///
-    /// <li>CPU (integer): <br>
-    /// The maximum amount of cpu time (in seconds) to be used by each process.</li>
-    ///
-    /// <li>Data (integer): <br>
-    /// The maximum size (in bytes) of the data segment for a process; this defines how far a program may
-    /// extend its break with the sbrk(2) system call.</li>
-    ///
     /// <li>FileSize (integer): <br>
     /// The largest size (in bytes) file that may be created.</li>
-    ///
-    /// <li>MemoryLock (integer): <br>
-    /// The maximum size (in bytes) which a process may lock into memory using the mlock(2) function.</li>
     ///
     /// <li>NumberOfFiles (integer): <br>
     /// The maximum number of open files for this process.  Setting this value in a system wide daemon will set
@@ -196,33 +354,35 @@ pub mod config {
     /// </ul>
     #[derive(Deserialize, Serialize, PartialEq, Debug)]
     pub struct ResourceLimit {
-        #[serde(rename = "Core")]
-        #[serde(skip_serializing_if = "Option::is_none")]
-        core: Option<i32>,
         #[serde(rename = "CPU")]
         #[serde(skip_serializing_if = "Option::is_none")]
-        cpu: Option<i32>,
-        #[serde(rename = "Data")]
-        #[serde(skip_serializing_if = "Option::is_none")]
-        data: Option<i32>,
+        cpu: Option<i64>,
         #[serde(rename = "FileSize")]
         #[serde(skip_serializing_if = "Option::is_none")]
-        file_size: Option<i32>,
-        #[serde(rename = "MemoryLock")]
-        #[serde(skip_serializing_if = "Option::is_none")]
-        memory_lock: Option<i32>,
+        file_size: Option<i64>,
         #[serde(rename = "NumberOfFiles")]
         #[serde(skip_serializing_if = "Option::is_none")]
-        number_of_files: Option<i32>,
+        number_of_files: Option<i64>,
         #[serde(rename = "NumberOfProcesses")]
         #[serde(skip_serializing_if = "Option::is_none")]
-        number_of_processes: Option<i32>,
+        number_of_processes: Option<i64>,
         #[serde(rename = "ResidentSetSize")]
         #[serde(skip_serializing_if = "Option::is_none")]
-        resident_set_size: Option<i32>,
+        resident_set_size: Option<i64>,
         #[serde(rename = "Stack")]
         #[serde(skip_serializing_if = "Option::is_none")]
-        stack: Option<i32>,
+        stack: Option<i64>,
+    }
+
+    impl ResourceLimit {
+        pub fn check(self) -> Result<ResourceLimit, Error> {
+            check_option_range_return_err!(self, file_size, 0, i64::MAX);
+            check_option_range_return_err!(self, number_of_files, 0, i64::MAX);
+            check_option_range_return_err!(self, number_of_processes, 0, 500);
+            check_option_range_return_err!(self, resident_set_size, 0, i64::MAX);
+            check_option_range_return_err!(self, stack, 0, 67104768);
+            Ok(self)
+        }
     }
 
     #[cfg(test)]
@@ -231,52 +391,45 @@ pub mod config {
 
         #[test]
         fn mock_config_yaml() {
-            let test_config = Configuration::new("com.tasker.test_task", "/bin/python")
-                .add_config(Config::StandardOutPath(
-                    "standard_in".parse().unwrap(),
-                ))
+            let test_config = Configuration::new("com.tasker.tasks.test_task", "/usr/bin/python")
+                .add_config(Config::StandardOutPath("/tmp/".parse().unwrap()))
                 .add_config(Config::HardResourceLimits(ResourceLimit {
-                    core: None,
                     cpu: None,
-                    data: None,
                     file_size: None,
-                    memory_lock: None,
                     number_of_files: Some(10000),
                     number_of_processes: Some(8),
                     resident_set_size: None,
-                    stack: None
+                    stack: None,
                 }))
-                .add_config(Config::KeepAlive(
-                    AliveCondition {
-                        crashed: Some(true),
-                        other_job_enabled: Some({
-                            let mut other_jobs = BTreeMap::new();
-                            other_jobs.insert(String::from("com.tasker.conflict"), false);
-                            other_jobs.insert(String::from("com.tasker.depended"), true);
-                            other_jobs
-                        }),
-                        successful_exit: Some(false),
-                    }
-                ))
+                .add_config(Config::KeepAlive(AliveCondition {
+                    crashed: Some(true),
+                    other_job_enabled: Some({
+                        let mut other_jobs = BTreeMap::new();
+                        other_jobs.insert(String::from("com.tasker.conflict"), false);
+                        other_jobs.insert(String::from("com.tasker.depended"), true);
+                        other_jobs
+                    }),
+                    successful_exit: Some(false),
+                }))
                 .add_config(Config::StartCalendarInterval(vec![
                     CalendarInterval {
                         minute: Some(15),
                         hour: Some(9),
                         day: None,
                         weekday: None,
-                        month: None
+                        month: None,
                     },
                     CalendarInterval {
                         minute: Some(0),
                         hour: Some(13),
                         day: None,
                         weekday: None,
-                        month: None
-                    }
+                        month: None,
+                    },
                 ]))
                 .add_config(Config::ProgramArguments(vec![
                     String::from("test_script.py"),
-                    String::from("--token=12345678")
+                    String::from("--token=12345678"),
                 ]))
                 .add_config(Config::EnvironmentVariables({
                     let mut env = BTreeMap::new();
@@ -287,10 +440,10 @@ pub mod config {
 
             let expected_deserialized = String::new()
                 + "---\n"
-                + "Label: com.tasker.test_task\n"
-                + "Program: /bin/python\n"
+                + "Label: test_task\n"
+                + "Program: /usr/bin/python\n"
                 + "Configuration:\n"
-                + "  - StandardOutPath: standard_in\n"
+                + "  - StandardOutPath: /tmp/\n"
                 + "  - HardResourceLimits:\n"
                 + "      NumberOfFiles: 10000\n"
                 + "      NumberOfProcesses: 8\n"
@@ -312,10 +465,7 @@ pub mod config {
                 + "      ALPHA: \"2.37\"\n"
                 + "      TOKEN: \"12345678\"";
 
-            assert_eq!(
-                test_config.to_yaml().unwrap(),
-                expected_deserialized
-            );
+            assert_eq!(test_config.to_yaml().unwrap(), expected_deserialized);
 
             assert_eq!(
                 Configuration::from_yaml(&expected_deserialized).unwrap(),
@@ -325,25 +475,18 @@ pub mod config {
 
         #[test]
         fn update_test_config() {
-            let test_config = Configuration::new("com.tasker.test_task", "/bin/python")
-                .add_config(Config::StandardOutPath(
-                    "standard_in".parse().unwrap(),
-                ))
-                .add_config(Config::StandardOutPath(
-                    "standard_in_new".parse().unwrap(),
-                ));
+            let test_config = Configuration::new("com.tasker.tasks.test_task", "/usr/bin/python")
+                .add_config(Config::StandardOutPath("/tmp/".parse().unwrap()))
+                .add_config(Config::StandardOutPath("/var/tmp/".parse().unwrap()));
 
             let expected_deserialized = String::new()
                 + "---\n"
-                + "Label: com.tasker.test_task\n"
-                + "Program: /bin/python\n"
+                + "Label: test_task\n"
+                + "Program: /usr/bin/python\n"
                 + "Configuration:\n"
-                + "  - StandardOutPath: standard_in_new";
+                + "  - StandardOutPath: /var/tmp/";
 
-            assert_eq!(
-                test_config.to_yaml().unwrap(),
-                expected_deserialized
-            );
+            assert_eq!(test_config.to_yaml().unwrap(), expected_deserialized);
 
             assert_eq!(
                 Configuration::from_yaml(&expected_deserialized).unwrap(),
@@ -353,10 +496,8 @@ pub mod config {
 
         #[test]
         fn update_test_config_from_yaml() {
-            let mut test_config = Configuration::new("com.tasker.test_task", "/bin/python")
-                .add_config(Config::StandardOutPath(
-                    "standard_in".parse().unwrap(),
-                ));
+            let mut test_config = Configuration::new("test_task", "/usr/bin/python")
+                .add_config(Config::StandardOutPath("/tmp/".parse().unwrap()));
 
             let yaml_to_add = String::new()
                 + "---\n"
@@ -366,60 +507,48 @@ pub mod config {
 
             let expected_deserialized = String::new()
                 + "---\n"
-                + "Label: com.tasker.test_task\n"
-                + "Program: /bin/python\n"
+                + "Label: test_task\n"
+                + "Program: /usr/bin/python\n"
                 + "Configuration:\n"
-                + "  - StandardOutPath: standard_in\n"
+                + "  - StandardOutPath: /tmp/\n"
                 + "  - StartCalendarInterval:\n"
                 + "      - Minute: 15\n"
                 + "        Hour: 9";
 
             test_config = test_config.add_config(Config::from_yaml(&yaml_to_add).unwrap());
 
-            assert_eq!(
-                test_config.to_yaml().unwrap(),
-                expected_deserialized
-            );
+            assert_eq!(test_config.to_yaml().unwrap(), expected_deserialized);
         }
 
         #[test]
         fn test_remove_config() {
-            let test_config = Configuration::new("com.tasker.test_task", "/bin/python")
-                .add_config(Config::StandardOutPath(
-                    "standard_in".parse().unwrap(),
-                ))
-                .add_config(Config::KeepAlive(
-                    AliveCondition {
-                        crashed: Some(true),
-                        successful_exit: Some(false),
-                        other_job_enabled: None
-                    }
-                ))
-                .add_config(Config::StartCalendarInterval(vec![
-                    CalendarInterval {
-                        minute: Some(15),
-                        hour: Some(9),
-                        day: None,
-                        weekday: None,
-                        month: None
-                    }
-                ]))
+            let test_config = Configuration::new("test_task", "/usr/bin/python")
+                .add_config(Config::StandardOutPath("/tmp/".parse().unwrap()))
+                .add_config(Config::KeepAlive(AliveCondition {
+                    crashed: Some(true),
+                    successful_exit: Some(false),
+                    other_job_enabled: None,
+                }))
+                .add_config(Config::StartCalendarInterval(vec![CalendarInterval {
+                    minute: Some(15),
+                    hour: Some(9),
+                    day: None,
+                    weekday: None,
+                    month: None,
+                }]))
                 .remove_config("KeepAlive");
 
             let expected_deserialized = String::new()
                 + "---\n"
-                + "Label: com.tasker.test_task\n"
-                + "Program: /bin/python\n"
+                + "Label: test_task\n"
+                + "Program: /usr/bin/python\n"
                 + "Configuration:\n"
-                + "  - StandardOutPath: standard_in\n"
+                + "  - StandardOutPath: /tmp/\n"
                 + "  - StartCalendarInterval:\n"
                 + "      - Minute: 15\n"
                 + "        Hour: 9";
 
-            assert_eq!(
-                test_config.to_yaml().unwrap(),
-                expected_deserialized
-            );
+            assert_eq!(test_config.to_yaml().unwrap(), expected_deserialized);
         }
     }
 }
@@ -429,11 +558,14 @@ pub mod launchd {
     mod plist {
 
         use crate::launchers::config;
-        use std::io::{Error, ErrorKind, BufWriter, IntoInnerError, Write};
         use serde::Serialize;
+        use std::io::{BufWriter, Error, ErrorKind, IntoInnerError, Write};
         use std::string::FromUtf8Error;
 
-        fn serde_plist<T>(ser: &T) -> Result<String, FromUtf8Error> where T: Serialize {
+        fn serde_plist<T>(ser: &T) -> Result<String, FromUtf8Error>
+        where
+            T: Serialize,
+        {
             let mut buf = Vec::new();
             plist::to_writer_xml(&mut buf, ser);
             String::from_utf8(buf)
@@ -441,28 +573,33 @@ pub mod launchd {
 
         pub fn get_plist_from_conf(conf: &config::Configuration) -> String {
             let raw_plist = serde_plist(conf).unwrap();
-            raw_plist.split('\n')
-                .filter(|&line| !line.starts_with("\t\t<dict>")
-                    && !line.starts_with("\t\t</dict>")
-                    && !line.starts_with("\t<key>Configuration</key>")
-                    && !line.starts_with("\t<array>")
-                    && !line.starts_with("\t</array>"))
-                .map(|line| {line.replacen("\t\t", "", 1)})
-                .collect::<Vec<String>>().join("\n")
+            raw_plist
+                .lines()
+                .filter(|&line| {
+                    !line.starts_with("\t\t<dict>")
+                        && !line.starts_with("\t\t</dict>")
+                        && !line.starts_with("\t<key>Configuration</key>")
+                        && !line.starts_with("\t<array>")
+                        && !line.starts_with("\t</array>")
+                })
+                .map(|line| line.replacen("\t\t", "", 1))
+                .collect::<Vec<String>>()
+                .join("\n")
         }
 
         #[cfg(test)]
         mod plist_tests {
             use super::*;
+            use crate::launchers::DOMAIN_NAME;
 
             #[test]
             fn test_get_plist() {
                 let yaml_config = String::new()
                     + "---\n"
-                    + "Label: com.tasker.test_task\n"
-                    + "Program: /bin/python\n"
+                    + "Label: test_task\n"
+                    + "Program: /usr/bin/python\n"
                     + "Configuration:\n"
-                    + "  - StandardOutPath: standard_in\n"
+                    + "  - StandardOutPath: /tmp/\n"
                     + "  - KeepAlive:\n"
                     + "      Crashed: true\n"
                     + "      OtherJobEnabled:\n"
@@ -486,11 +623,14 @@ pub mod launchd {
                     + "<plist version=\"1.0\">\n"
                     + "<dict>\n"
                     + "\t<key>Label</key>\n"
-                    + "\t<string>com.tasker.test_task</string>\n"
+                    + "\t<string>"
+                    + &DOMAIN_NAME
+                    + "."
+                    + "test_task</string>\n"
                     + "\t<key>Program</key>\n"
-                    + "\t<string>/bin/python</string>\n"
+                    + "\t<string>/usr/bin/python</string>\n"
                     + "\t<key>StandardOutPath</key>\n"
-                    + "\t<string>standard_in</string>\n"
+                    + "\t<string>/tmp/</string>\n"
                     + "\t<key>KeepAlive</key>\n"
                     + "\t<dict>\n"
                     + "\t\t<key>SuccessfulExit</key>\n"
@@ -538,9 +678,7 @@ pub mod launchd {
                 let plist = get_plist_from_conf(&config);
 
                 assert_eq!(plist, expected_plist);
-
             }
         }
     }
-
 }

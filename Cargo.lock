@@ -1508,7 +1508,9 @@ name = "tasker"
 version = "0.1.0"
 dependencies = [
  "actix-web",
+ "lazy_static",
  "plist",
+ "regex",
  "serde",
  "serde_yaml",
  "strum_macros",
