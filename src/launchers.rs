@@ -73,8 +73,8 @@ pub mod config {
         StandardInPath(String),
         StandardOutPath(String),
         StandardErrorPath(String),
-        SoftResourceLimit(Limit),
-        HardResourceLimits(Limit)
+        SoftResourceLimit(ResourceLimit),
+        HardResourceLimits(ResourceLimit)
     }
 
     impl Config {
@@ -195,7 +195,7 @@ pub mod config {
     ///
     /// </ul>
     #[derive(Deserialize, Serialize, PartialEq, Debug)]
-    pub struct Limit {
+    pub struct ResourceLimit {
         #[serde(rename = "Core")]
         #[serde(skip_serializing_if = "Option::is_none")]
         core: Option<i32>,
@@ -235,7 +235,7 @@ pub mod config {
                 .add_config(Config::StandardOutPath(
                     "standard_in".parse().unwrap(),
                 ))
-                .add_config(Config::HardResourceLimits(Limit{
+                .add_config(Config::HardResourceLimits(ResourceLimit {
                     core: None,
                     cpu: None,
                     data: None,
