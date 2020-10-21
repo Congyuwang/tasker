@@ -64,7 +64,7 @@ pub mod config {
     pub enum Config {
         ProgramArguments(Vec<String>),
         EnvironmentVariables(BTreeMap<String, String>),
-        KeepAlive(Vec<AliveCondition>),
+        KeepAlive(AliveCondition),
         RunAtLoad(bool),
         WorkingDirectory(String),
         ExitTimeOut(i32),
@@ -73,8 +73,8 @@ pub mod config {
         StandardInPath(String),
         StandardOutPath(String),
         StandardErrorPath(String),
-        SoftResourceLimit(Vec<Limit>),
-        HardResourceLimits(Vec<Limit>)
+        SoftResourceLimit(Limit),
+        HardResourceLimits(Limit)
     }
 
     impl Config {
@@ -86,8 +86,6 @@ pub mod config {
     /// AliveCondition
     ///
     /// <ul>
-    ///
-    /// <li>Always: always alive.</li>
     ///
     /// <li>SuccessfulExit (boolean):<br>
     /// If true, the job will be restarted as long as the program exits and with an exit status of zero. If
@@ -111,11 +109,16 @@ pub mod config {
     ///
     /// </ul>
     #[derive(Deserialize, Serialize, PartialEq, Debug)]
-    pub enum AliveCondition {
-        Always,
-        SuccessfulExit(bool),
-        OtherJobEnabled(BTreeMap<String, bool>),
-        Crashed(bool),
+    pub struct AliveCondition {
+        #[serde(rename = "SuccessfulExit")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        successful_exit: Option<bool>,
+        #[serde(rename = "OtherJobEnabled")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        other_job_enabled: Option<BTreeMap<String, bool>>,
+        #[serde(rename = "Crashed")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        crashed: Option<bool>,
     }
 
     /// Calendar intervals
@@ -133,13 +136,23 @@ pub mod config {
     /// <li>Month (integer):<br>
     /// The month (1-12) on which this job will be run.</li>
     /// </ul>
-    #[derive(Deserialize, Serialize, PartialEq, Debug)]
-    pub enum CalendarInterval {
-        Minute(i32),
-        Hour(i32),
-        Day(i32),
-        Weekday(i32),
-        Month(i32),
+    #[derive(Deserialize, Serialize, PartialEq, Debug, Hash, Eq)]
+    pub struct CalendarInterval {
+        #[serde(rename = "Minute")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        minute: Option<i32>,
+        #[serde(rename = "Hour")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        hour: Option<i32>,
+        #[serde(rename = "Day")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        day: Option<i32>,
+        #[serde(rename = "Weekday")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        weekday: Option<i32>,
+        #[serde(rename = "Month")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        month: Option<i32>,
     }
 
     /// Resource Limit
@@ -182,16 +195,34 @@ pub mod config {
     ///
     /// </ul>
     #[derive(Deserialize, Serialize, PartialEq, Debug)]
-    pub enum Limit {
-        Core(i32),
-        CPU(i32),
-        Data(i32),
-        FileSize(i32),
-        MemoryLock(i32),
-        NumberOfFiles(i32),
-        NumberOfProcesses(i32),
-        ResidentSetSize(i32),
-        Stack(i32),
+    pub struct Limit {
+        #[serde(rename = "Core")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        core: Option<i32>,
+        #[serde(rename = "CPU")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        cpu: Option<i32>,
+        #[serde(rename = "Data")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        data: Option<i32>,
+        #[serde(rename = "FileSize")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        file_size: Option<i32>,
+        #[serde(rename = "MemoryLock")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        memory_lock: Option<i32>,
+        #[serde(rename = "NumberOfFiles")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        number_of_files: Option<i32>,
+        #[serde(rename = "NumberOfProcesses")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        number_of_processes: Option<i32>,
+        #[serde(rename = "ResidentSetSize")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        resident_set_size: Option<i32>,
+        #[serde(rename = "Stack")]
+        #[serde(skip_serializing_if = "Option::is_none")]
+        stack: Option<i32>,
     }
 
     #[cfg(test)]
@@ -204,23 +235,44 @@ pub mod config {
                 .add_config(Config::StandardOutPath(
                     "standard_in".parse().unwrap(),
                 ))
-                .add_config(Config::HardResourceLimits(vec![
-                    Limit::NumberOfFiles(10000),
-                    Limit::NumberOfProcesses(8),
-                ]))
-                .add_config(Config::KeepAlive(vec![
-                    AliveCondition::Crashed(true),
-                    AliveCondition::OtherJobEnabled({
-                        let mut other_jobs = BTreeMap::new();
-                        other_jobs.insert(String::from("com.tasker.conflict"), false);
-                        other_jobs.insert(String::from("com.tasker.depended"), true);
-                        other_jobs
-                    }),
-                    AliveCondition::SuccessfulExit(false),
-                ]))
+                .add_config(Config::HardResourceLimits(Limit{
+                    core: None,
+                    cpu: None,
+                    data: None,
+                    file_size: None,
+                    memory_lock: None,
+                    number_of_files: Some(10000),
+                    number_of_processes: Some(8),
+                    resident_set_size: None,
+                    stack: None
+                }))
+                .add_config(Config::KeepAlive(
+                    AliveCondition {
+                        crashed: Some(true),
+                        other_job_enabled: Some({
+                            let mut other_jobs = BTreeMap::new();
+                            other_jobs.insert(String::from("com.tasker.conflict"), false);
+                            other_jobs.insert(String::from("com.tasker.depended"), true);
+                            other_jobs
+                        }),
+                        successful_exit: Some(false),
+                    }
+                ))
                 .add_config(Config::StartCalendarInterval(vec![
-                    CalendarInterval::Hour(9),
-                    CalendarInterval::Minute(15),
+                    CalendarInterval {
+                        minute: Some(15),
+                        hour: Some(9),
+                        day: None,
+                        weekday: None,
+                        month: None
+                    },
+                    CalendarInterval {
+                        minute: Some(0),
+                        hour: Some(13),
+                        day: None,
+                        weekday: None,
+                        month: None
+                    }
                 ]))
                 .add_config(Config::ProgramArguments(vec![
                     String::from("test_script.py"),
@@ -240,17 +292,19 @@ pub mod config {
                 + "Configuration:\n"
                 + "  - StandardOutPath: standard_in\n"
                 + "  - HardResourceLimits:\n"
-                + "      - NumberOfFiles: 10000\n"
-                + "      - NumberOfProcesses: 8\n"
+                + "      NumberOfFiles: 10000\n"
+                + "      NumberOfProcesses: 8\n"
                 + "  - KeepAlive:\n"
-                + "      - Crashed: true\n"
-                + "      - OtherJobEnabled:\n"
-                + "          com.tasker.conflict: false\n"
-                + "          com.tasker.depended: true\n"
-                + "      - SuccessfulExit: false\n"
+                + "      SuccessfulExit: false\n"
+                + "      OtherJobEnabled:\n"
+                + "        com.tasker.conflict: false\n"
+                + "        com.tasker.depended: true\n"
+                + "      Crashed: true\n"
                 + "  - StartCalendarInterval:\n"
-                + "      - Hour: 9\n"
                 + "      - Minute: 15\n"
+                + "        Hour: 9\n"
+                + "      - Minute: 0\n"
+                + "        Hour: 13\n"
                 + "  - ProgramArguments:\n"
                 + "      - test_script.py\n"
                 + "      - \"--token=12345678\"\n"
@@ -307,8 +361,8 @@ pub mod config {
             let yaml_to_add = String::new()
                 + "---\n"
                 + "StartCalendarInterval:\n"
-                + "  - Hour: 9\n"
-                + "  - Minute: 15";
+                + "  - Minute: 15\n"
+                + "    Hour: 9\n";
 
             let expected_deserialized = String::new()
                 + "---\n"
@@ -317,8 +371,8 @@ pub mod config {
                 + "Configuration:\n"
                 + "  - StandardOutPath: standard_in\n"
                 + "  - StartCalendarInterval:\n"
-                + "      - Hour: 9\n"
-                + "      - Minute: 15";
+                + "      - Minute: 15\n"
+                + "        Hour: 9";
 
             test_config = test_config.add_config(Config::from_yaml(&yaml_to_add).unwrap());
 
@@ -334,13 +388,21 @@ pub mod config {
                 .add_config(Config::StandardOutPath(
                     "standard_in".parse().unwrap(),
                 ))
-                .add_config(Config::KeepAlive(vec![
-                    AliveCondition::Crashed(true),
-                    AliveCondition::SuccessfulExit(false),
-                ]))
+                .add_config(Config::KeepAlive(
+                    AliveCondition {
+                        crashed: Some(true),
+                        successful_exit: Some(false),
+                        other_job_enabled: None
+                    }
+                ))
                 .add_config(Config::StartCalendarInterval(vec![
-                    CalendarInterval::Hour(9),
-                    CalendarInterval::Minute(15),
+                    CalendarInterval {
+                        minute: Some(15),
+                        hour: Some(9),
+                        day: None,
+                        weekday: None,
+                        month: None
+                    }
                 ]))
                 .remove_config("KeepAlive");
 
@@ -351,8 +413,8 @@ pub mod config {
                 + "Configuration:\n"
                 + "  - StandardOutPath: standard_in\n"
                 + "  - StartCalendarInterval:\n"
-                + "      - Hour: 9\n"
-                + "      - Minute: 15";
+                + "      - Minute: 15\n"
+                + "        Hour: 9";
 
             assert_eq!(
                 test_config.to_yaml().unwrap(),
@@ -379,47 +441,14 @@ pub mod launchd {
 
         pub fn get_plist_from_conf(conf: &config::Configuration) -> String {
             let raw_plist = serde_plist(conf).unwrap();
-            let mut filtered = raw_plist.split('\n')
+            raw_plist.split('\n')
                 .filter(|&line| !line.starts_with("\t\t<dict>")
                     && !line.starts_with("\t\t</dict>")
                     && !line.starts_with("\t<key>Configuration</key>")
                     && !line.starts_with("\t<array>")
-                    && !line.starts_with("\t</array>")
-                    && !line.starts_with("\t\t\t\t<dict>")
-                    && !line.starts_with("\t\t\t\t</dict>"))
-                .map(|line| {line.replace("</array>", "</dict>")})
-                .map(|line| {line.replace("<array>", "<dict>")})
-                .map(|line| {line.replace("\t\t\t\t\t\t", "\t\t\t\t\t\t\t\t")})
-                .map(|line| {line.replace("\t\t\t", "\t")})
-                .map(|line| {line.replace("\t\t\t", "\t\t")})
-                .collect::<Vec<String>>();
-            let mut last_line: Option<&mut String> = None;
-            let mut check_wrong_dict_flag: bool = false;
-            let mut is_in_wrong_block: bool = false;
-            for l in &mut filtered {
-                if is_in_wrong_block {
-                    if l.starts_with("\t</dict>") {
-                        *l = l.replace("\t</dict>", "\t</array>");
-                        is_in_wrong_block = false;
-                    }
-                }
-                if check_wrong_dict_flag {
-                    if l.starts_with("\t\t<string>") {
-                        is_in_wrong_block = true;
-                        let get_last_line = last_line.unwrap();
-                        *get_last_line = get_last_line.replace("\t<dict>", "\t<array>");
-
-                        last_line = None;
-                    }
-                    check_wrong_dict_flag = false;
-                    continue;
-                }
-                if l.starts_with("\t<dict>") {
-                    check_wrong_dict_flag = true;
-                    last_line = Some(l);
-                }
-            }
-            filtered.join("\n")
+                    && !line.starts_with("\t</array>"))
+                .map(|line| {line.replacen("\t\t", "", 1)})
+                .collect::<Vec<String>>().join("\n")
         }
 
         #[cfg(test)]
@@ -435,62 +464,72 @@ pub mod launchd {
                     + "Configuration:\n"
                     + "  - StandardOutPath: standard_in\n"
                     + "  - KeepAlive:\n"
-                    + "      - Crashed: true\n"
-                    + "      - OtherJobEnabled:\n"
-                    + "          com.tasker.conflict: false\n"
-                    + "          com.tasker.depended: true\n"
-                    + "      - SuccessfulExit: false\n"
+                    + "      Crashed: true\n"
+                    + "      OtherJobEnabled:\n"
+                    + "        com.tasker.conflict: false\n"
+                    + "        com.tasker.depended: true\n"
+                    + "      SuccessfulExit: false\n"
                     + "  - StartCalendarInterval:\n"
-                    + "      - Hour: 9\n"
                     + "      - Minute: 15\n"
+                    + "        Hour: 9\n"
+                    + "      - Minute: 0\n"
+                    + "        Hour: 13\n"
                     + "  - ProgramArguments:\n"
                     + "      - test_script.py\n"
                     + "      - \"--token=12345678\"\n"
                     + "  - EnvironmentVariables:\n"
-                    + "      TOKEN: \"12345678\"";
+                    + "      TOKEN: 12345678";
 
                 let expected_plist = String::new()
                     + "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
                     + "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
                     + "<plist version=\"1.0\">\n"
                     + "<dict>\n"
-                    + "	<key>Label</key>\n"
-                    + "	<string>com.tasker.test_task</string>\n"
-                    + "	<key>Program</key>\n"
-                    + "	<string>/bin/python</string>\n"
-                    + "	<key>StandardOutPath</key>\n"
-                    + "	<string>standard_in</string>\n"
-                    + "	<key>KeepAlive</key>\n"
-                    + "	<dict>\n"
-                    + "		<key>Crashed</key>\n"
-                    + "		<true />\n"
-                    + "		<key>OtherJobEnabled</key>\n"
-                    + "		<dict>\n"
-                    + "			<key>com.tasker.conflict</key>\n"
-                    + "			<false />\n"
-                    + "			<key>com.tasker.depended</key>\n"
-                    + "			<true />\n"
-                    + "		</dict>\n"
-                    + "		<key>SuccessfulExit</key>\n"
-                    + "		<false />\n"
-                    + "	</dict>\n"
-                    + "	<key>StartCalendarInterval</key>\n"
-                    + "	<dict>\n"
-                    + "		<key>Hour</key>\n"
-                    + "		<integer>9</integer>\n"
-                    + "		<key>Minute</key>\n"
-                    + "		<integer>15</integer>\n"
-                    + "	</dict>\n"
-                    + "	<key>ProgramArguments</key>\n"
-                    + "	<array>\n"
-                    + "		<string>test_script.py</string>\n"
-                    + "		<string>--token=12345678</string>\n"
-                    + "	</array>\n"
-                    + "	<key>EnvironmentVariables</key>\n"
-                    + "	<dict>\n"
-                    + "		<key>TOKEN</key>\n"
-                    + "		<string>12345678</string>\n"
-                    + "	</dict>\n"
+                    + "\t<key>Label</key>\n"
+                    + "\t<string>com.tasker.test_task</string>\n"
+                    + "\t<key>Program</key>\n"
+                    + "\t<string>/bin/python</string>\n"
+                    + "\t<key>StandardOutPath</key>\n"
+                    + "\t<string>standard_in</string>\n"
+                    + "\t<key>KeepAlive</key>\n"
+                    + "\t<dict>\n"
+                    + "\t\t<key>SuccessfulExit</key>\n"
+                    + "\t\t<false />\n"
+                    + "\t\t<key>OtherJobEnabled</key>\n"
+                    + "\t\t<dict>\n"
+                    + "\t\t\t<key>com.tasker.conflict</key>\n"
+                    + "\t\t\t<false />\n"
+                    + "\t\t\t<key>com.tasker.depended</key>\n"
+                    + "\t\t\t<true />\n"
+                    + "\t\t</dict>\n"
+                    + "\t\t<key>Crashed</key>\n"
+                    + "\t\t<true />\n"
+                    + "\t</dict>\n"
+                    + "\t<key>StartCalendarInterval</key>\n"
+                    + "\t<array>\n"
+                    + "\t\t<dict>\n"
+                    + "\t\t\t<key>Minute</key>\n"
+                    + "\t\t\t<integer>15</integer>\n"
+                    + "\t\t\t<key>Hour</key>\n"
+                    + "\t\t\t<integer>9</integer>\n"
+                    + "\t\t</dict>\n"
+                    + "\t\t<dict>\n"
+                    + "\t\t\t<key>Minute</key>\n"
+                    + "\t\t\t<integer>0</integer>\n"
+                    + "\t\t\t<key>Hour</key>\n"
+                    + "\t\t\t<integer>13</integer>\n"
+                    + "\t\t</dict>\n"
+                    + "\t</array>\n"
+                    + "\t<key>ProgramArguments</key>\n"
+                    + "\t<array>\n"
+                    + "\t\t<string>test_script.py</string>\n"
+                    + "\t\t<string>--token=12345678</string>\n"
+                    + "\t</array>\n"
+                    + "\t<key>EnvironmentVariables</key>\n"
+                    + "\t<dict>\n"
+                    + "\t\t<key>TOKEN</key>\n"
+                    + "\t\t<string>12345678</string>\n"
+                    + "\t</dict>\n"
                     + "</dict>\n"
                     + "</plist>";
 
