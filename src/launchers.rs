@@ -1,7 +1,7 @@
 /// config module provides general configuration for tasks
 pub mod config {
     use serde::{Deserialize, Serialize};
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
     use std::string::ToString;
 
     /// Config:
@@ -13,8 +13,11 @@ pub mod config {
     /// </p>
     #[derive(Deserialize, Serialize, Debug, PartialEq)]
     pub struct Configuration {
+        #[serde(rename = "Label")]
         label: String,
+        #[serde(rename = "Program")]
         program: String,
+        #[serde(rename = "Configuration")]
         configuration: Vec<Config>,
     }
 
@@ -59,19 +62,19 @@ pub mod config {
 
     #[derive(Deserialize, Serialize, PartialEq, Debug, Display)]
     pub enum Config {
-        ProgramArguments(Option<Vec<String>>),
-        EnvironmentVariables(Option<HashMap<String, String>>),
-        KeepAlive(Option<Vec<AliveCondition>>),
-        RunAtLoad(Option<bool>),
-        WorkingDirectory(Option<String>),
-        ExitTimeOut(Option<i32>),
-        StartInterval(Option<i32>),
-        StartCalendarInterval(Option<Vec<CalendarInterval>>),
-        StandardInPath(Option<String>),
-        StandardOutPath(Option<String>),
-        StandardErrorPath(Option<String>),
-        SoftResourceLimit(Option<Vec<Limit>>),
-        HardResourceLimits(Option<Vec<Limit>>)
+        ProgramArguments(Vec<String>),
+        EnvironmentVariables(BTreeMap<String, String>),
+        KeepAlive(Vec<AliveCondition>),
+        RunAtLoad(bool),
+        WorkingDirectory(String),
+        ExitTimeOut(i32),
+        StartInterval(i32),
+        StartCalendarInterval(Vec<CalendarInterval>),
+        StandardInPath(String),
+        StandardOutPath(String),
+        StandardErrorPath(String),
+        SoftResourceLimit(Vec<Limit>),
+        HardResourceLimits(Vec<Limit>)
     }
 
     impl Config {
@@ -95,6 +98,12 @@ pub mod config {
     /// Each key in this dictionary is the name of another job. If the value is true, then the job will be kept
     /// alive as long as one of the specified other jobs is loaded in launchd(8).</li>
     ///
+    /// <p>
+    /// NOTE: This key only evaluates whether the job is loaded, not whether it is running. Use of this key is
+    /// highly discouraged. If multiple jobs need to coordinate coordinate their lifecycles, they should
+    /// establish contracts using IPC.
+    /// </p>
+    ///
     /// <li>Crashed (boolean):<br>
     /// If true, the the job will be restarted as long as it exited due to a signal which is typically
     /// associated with a crash (SIGILL, SIGSEGV, etc.). If false, the job will be restarted in the
@@ -105,7 +114,7 @@ pub mod config {
     pub enum AliveCondition {
         Always,
         SuccessfulExit(bool),
-        OtherJobEnabled(HashMap<String, bool>),
+        OtherJobEnabled(BTreeMap<String, bool>),
         Crashed(bool),
     }
 
@@ -192,37 +201,62 @@ pub mod config {
         #[test]
         fn mock_config_yaml() {
             let test_config = Configuration::new("com.tasker.test_task", "/bin/python")
-                .add_config(Config::StandardOutPath(Some(
+                .add_config(Config::StandardOutPath(
                     "standard_in".parse().unwrap(),
-                )))
-                .add_config(Config::HardResourceLimits(Some(vec![
+                ))
+                .add_config(Config::HardResourceLimits(vec![
                     Limit::NumberOfFiles(10000),
                     Limit::NumberOfProcesses(8),
-                ])))
-                .add_config(Config::KeepAlive(Some(vec![
+                ]))
+                .add_config(Config::KeepAlive(vec![
                     AliveCondition::Crashed(true),
+                    AliveCondition::OtherJobEnabled({
+                        let mut other_jobs = BTreeMap::new();
+                        other_jobs.insert(String::from("com.tasker.conflict"), false);
+                        other_jobs.insert(String::from("com.tasker.depended"), true);
+                        other_jobs
+                    }),
                     AliveCondition::SuccessfulExit(false),
-                ])))
-                .add_config(Config::StartCalendarInterval(Some(vec![
+                ]))
+                .add_config(Config::StartCalendarInterval(vec![
                     CalendarInterval::Hour(9),
                     CalendarInterval::Minute(15),
-                ])));
+                ]))
+                .add_config(Config::ProgramArguments(vec![
+                    String::from("test_script.py"),
+                    String::from("--token=12345678")
+                ]))
+                .add_config(Config::EnvironmentVariables({
+                    let mut env = BTreeMap::new();
+                    env.insert(String::from("TOKEN"), String::from("12345678"));
+                    env.insert(String::from("ALPHA"), String::from("2.37"));
+                    env
+                }));
 
             let expected_deserialized = String::new()
                 + "---\n"
-                + "label: com.tasker.test_task\n"
-                + "program: /bin/python\n"
-                + "configuration:\n"
+                + "Label: com.tasker.test_task\n"
+                + "Program: /bin/python\n"
+                + "Configuration:\n"
                 + "  - StandardOutPath: standard_in\n"
                 + "  - HardResourceLimits:\n"
                 + "      - NumberOfFiles: 10000\n"
                 + "      - NumberOfProcesses: 8\n"
                 + "  - KeepAlive:\n"
                 + "      - Crashed: true\n"
+                + "      - OtherJobEnabled:\n"
+                + "          com.tasker.conflict: false\n"
+                + "          com.tasker.depended: true\n"
                 + "      - SuccessfulExit: false\n"
                 + "  - StartCalendarInterval:\n"
                 + "      - Hour: 9\n"
-                + "      - Minute: 15";
+                + "      - Minute: 15\n"
+                + "  - ProgramArguments:\n"
+                + "      - test_script.py\n"
+                + "      - \"--token=12345678\"\n"
+                + "  - EnvironmentVariables:\n"
+                + "      ALPHA: \"2.37\"\n"
+                + "      TOKEN: \"12345678\"";
 
             assert_eq!(
                 test_config.to_yaml().unwrap(),
@@ -230,7 +264,7 @@ pub mod config {
             );
 
             assert_eq!(
-                Configuration::from_yaml(&expected_deserialized[..]).unwrap(),
+                Configuration::from_yaml(&expected_deserialized).unwrap(),
                 test_config,
             );
         }
@@ -238,18 +272,18 @@ pub mod config {
         #[test]
         fn update_test_config() {
             let test_config = Configuration::new("com.tasker.test_task", "/bin/python")
-                .add_config(Config::StandardOutPath(Some(
+                .add_config(Config::StandardOutPath(
                     "standard_in".parse().unwrap(),
-                )))
-                .add_config(Config::StandardOutPath(Some(
+                ))
+                .add_config(Config::StandardOutPath(
                     "standard_in_new".parse().unwrap(),
-                )));
+                ));
 
             let expected_deserialized = String::new()
                 + "---\n"
-                + "label: com.tasker.test_task\n"
-                + "program: /bin/python\n"
-                + "configuration:\n"
+                + "Label: com.tasker.test_task\n"
+                + "Program: /bin/python\n"
+                + "Configuration:\n"
                 + "  - StandardOutPath: standard_in_new";
 
             assert_eq!(
@@ -266,9 +300,9 @@ pub mod config {
         #[test]
         fn update_test_config_from_yaml() {
             let mut test_config = Configuration::new("com.tasker.test_task", "/bin/python")
-                .add_config(Config::StandardOutPath(Some(
+                .add_config(Config::StandardOutPath(
                     "standard_in".parse().unwrap(),
-                )));
+                ));
 
             let yaml_to_add = String::new()
                 + "---\n"
@@ -278,9 +312,9 @@ pub mod config {
 
             let expected_deserialized = String::new()
                 + "---\n"
-                + "label: com.tasker.test_task\n"
-                + "program: /bin/python\n"
-                + "configuration:\n"
+                + "Label: com.tasker.test_task\n"
+                + "Program: /bin/python\n"
+                + "Configuration:\n"
                 + "  - StandardOutPath: standard_in\n"
                 + "  - StartCalendarInterval:\n"
                 + "      - Hour: 9\n"
@@ -297,24 +331,24 @@ pub mod config {
         #[test]
         fn test_remove_config() {
             let test_config = Configuration::new("com.tasker.test_task", "/bin/python")
-                .add_config(Config::StandardOutPath(Some(
+                .add_config(Config::StandardOutPath(
                     "standard_in".parse().unwrap(),
-                )))
-                .add_config(Config::KeepAlive(Some(vec![
+                ))
+                .add_config(Config::KeepAlive(vec![
                     AliveCondition::Crashed(true),
                     AliveCondition::SuccessfulExit(false),
-                ])))
-                .add_config(Config::StartCalendarInterval(Some(vec![
+                ]))
+                .add_config(Config::StartCalendarInterval(vec![
                     CalendarInterval::Hour(9),
                     CalendarInterval::Minute(15),
-                ])))
+                ]))
                 .remove_config("KeepAlive");
 
             let expected_deserialized = String::new()
                 + "---\n"
-                + "label: com.tasker.test_task\n"
-                + "program: /bin/python\n"
-                + "configuration:\n"
+                + "Label: com.tasker.test_task\n"
+                + "Program: /bin/python\n"
+                + "Configuration:\n"
                 + "  - StandardOutPath: standard_in\n"
                 + "  - StartCalendarInterval:\n"
                 + "      - Hour: 9\n"
@@ -330,8 +364,144 @@ pub mod config {
 
 pub mod launchd {
 
-    // use crate::launchers::config;
+    mod plist {
 
-    // fn get_plist(conf: config::Configuration) -> String {
-    // }
+        use crate::launchers::config;
+        use std::io::{Error, ErrorKind, BufWriter, IntoInnerError, Write};
+        use serde::Serialize;
+        use std::string::FromUtf8Error;
+
+        fn serde_plist<T>(ser: &T) -> Result<String, FromUtf8Error> where T: Serialize {
+            let mut buf = Vec::new();
+            plist::to_writer_xml(&mut buf, ser);
+            String::from_utf8(buf)
+        }
+
+        pub fn get_plist_from_conf(conf: &config::Configuration) -> String {
+            let raw_plist = serde_plist(conf).unwrap();
+            let mut filtered = raw_plist.split('\n')
+                .filter(|&line| !line.starts_with("\t\t<dict>")
+                    && !line.starts_with("\t\t</dict>")
+                    && !line.starts_with("\t<key>Configuration</key>")
+                    && !line.starts_with("\t<array>")
+                    && !line.starts_with("\t</array>")
+                    && !line.starts_with("\t\t\t\t<dict>")
+                    && !line.starts_with("\t\t\t\t</dict>"))
+                .map(|line| {line.replace("</array>", "</dict>")})
+                .map(|line| {line.replace("<array>", "<dict>")})
+                .map(|line| {line.replace("\t\t\t\t\t\t", "\t\t\t\t\t\t\t\t")})
+                .map(|line| {line.replace("\t\t\t", "\t")})
+                .map(|line| {line.replace("\t\t\t", "\t\t")})
+                .collect::<Vec<String>>();
+            let mut last_line: Option<&mut String> = None;
+            let mut check_wrong_dict_flag: bool = false;
+            let mut is_in_wrong_block: bool = false;
+            for l in &mut filtered {
+                if is_in_wrong_block {
+                    if l.starts_with("\t</dict>") {
+                        *l = l.replace("\t</dict>", "\t</array>");
+                        is_in_wrong_block = false;
+                    }
+                }
+                if check_wrong_dict_flag {
+                    if l.starts_with("\t\t<string>") {
+                        is_in_wrong_block = true;
+                        let get_last_line = last_line.unwrap();
+                        *get_last_line = get_last_line.replace("\t<dict>", "\t<array>");
+
+                        last_line = None;
+                    }
+                    check_wrong_dict_flag = false;
+                    continue;
+                }
+                if l.starts_with("\t<dict>") {
+                    check_wrong_dict_flag = true;
+                    last_line = Some(l);
+                }
+            }
+            filtered.join("\n")
+        }
+
+        #[cfg(test)]
+        mod plist_tests {
+            use super::*;
+
+            #[test]
+            fn test_get_plist() {
+                let yaml_config = String::new()
+                    + "---\n"
+                    + "Label: com.tasker.test_task\n"
+                    + "Program: /bin/python\n"
+                    + "Configuration:\n"
+                    + "  - StandardOutPath: standard_in\n"
+                    + "  - KeepAlive:\n"
+                    + "      - Crashed: true\n"
+                    + "      - OtherJobEnabled:\n"
+                    + "          com.tasker.conflict: false\n"
+                    + "          com.tasker.depended: true\n"
+                    + "      - SuccessfulExit: false\n"
+                    + "  - StartCalendarInterval:\n"
+                    + "      - Hour: 9\n"
+                    + "      - Minute: 15\n"
+                    + "  - ProgramArguments:\n"
+                    + "      - test_script.py\n"
+                    + "      - \"--token=12345678\"\n"
+                    + "  - EnvironmentVariables:\n"
+                    + "      TOKEN: \"12345678\"";
+
+                let expected_plist = String::new()
+                    + "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n"
+                    + "<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n"
+                    + "<plist version=\"1.0\">\n"
+                    + "<dict>\n"
+                    + "	<key>Label</key>\n"
+                    + "	<string>com.tasker.test_task</string>\n"
+                    + "	<key>Program</key>\n"
+                    + "	<string>/bin/python</string>\n"
+                    + "	<key>StandardOutPath</key>\n"
+                    + "	<string>standard_in</string>\n"
+                    + "	<key>KeepAlive</key>\n"
+                    + "	<dict>\n"
+                    + "		<key>Crashed</key>\n"
+                    + "		<true />\n"
+                    + "		<key>OtherJobEnabled</key>\n"
+                    + "		<dict>\n"
+                    + "			<key>com.tasker.conflict</key>\n"
+                    + "			<false />\n"
+                    + "			<key>com.tasker.depended</key>\n"
+                    + "			<true />\n"
+                    + "		</dict>\n"
+                    + "		<key>SuccessfulExit</key>\n"
+                    + "		<false />\n"
+                    + "	</dict>\n"
+                    + "	<key>StartCalendarInterval</key>\n"
+                    + "	<dict>\n"
+                    + "		<key>Hour</key>\n"
+                    + "		<integer>9</integer>\n"
+                    + "		<key>Minute</key>\n"
+                    + "		<integer>15</integer>\n"
+                    + "	</dict>\n"
+                    + "	<key>ProgramArguments</key>\n"
+                    + "	<array>\n"
+                    + "		<string>test_script.py</string>\n"
+                    + "		<string>--token=12345678</string>\n"
+                    + "	</array>\n"
+                    + "	<key>EnvironmentVariables</key>\n"
+                    + "	<dict>\n"
+                    + "		<key>TOKEN</key>\n"
+                    + "		<string>12345678</string>\n"
+                    + "	</dict>\n"
+                    + "</dict>\n"
+                    + "</plist>";
+
+                let config = config::Configuration::from_yaml(&yaml_config).unwrap();
+
+                let plist = get_plist_from_conf(&config);
+
+                assert_eq!(plist, expected_plist);
+
+            }
+        }
+    }
+
 }
