@@ -155,9 +155,9 @@ impl Configuration {
 
     fn check_label(self) -> Result<Configuration, Error> {
         lazy_static! {
-            static ref LabelRegex: Regex = Regex::new("[a-z]+(\\.[a-z]+)*").unwrap();
+            static ref LABEL_REGEX: Regex = Regex::new("[a-z]+(\\.[a-z]+)*").unwrap();
         }
-        if !LabelRegex.is_match(&self.label) {
+        if !LABEL_REGEX.is_match(&self.label) {
             return Err(Error::ConfigLabelError(format!(
                 "`{}` is not a valid label",
                 &self.label
