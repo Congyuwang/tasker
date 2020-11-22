@@ -9,6 +9,5 @@ static DOMAIN_NAME: &str = "com.tasker.tasks";
 /// apple plist.
 mod config;
 mod error;
-mod launchctl;
 mod file_util;
-
+mod launchctl;

@@ -7,6 +7,7 @@ pub enum Error {
     ConfigPathError(String),
     ConfigLabelError(String),
     ConfigProgramError(String),
+    LaunchctlListError(String),
     DecompressionError(String),
-    RenameError(String)
+    RenameError(String),
 }
