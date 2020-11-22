@@ -25,8 +25,10 @@ pub fn list(label_pattern: &str) -> Result<String, Error> {
             std::str::from_utf8(&list_output.stderr).unwrap()
         )));
     };
-    let task_info =
-        TaskInfo::from_str_filter(std::str::from_utf8(&list_output.stdout).unwrap(), label_pattern);
+    let task_info = TaskInfo::from_str_filter(
+        std::str::from_utf8(&list_output.stdout).unwrap(),
+        label_pattern,
+    );
     match serde_json::to_string_pretty(&task_info) {
         Ok(s) => Ok(s),
         Err(_) => {

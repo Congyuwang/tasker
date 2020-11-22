@@ -11,3 +11,4 @@ mod config;
 mod error;
 mod file_util;
 mod launchctl;
+pub mod server;
