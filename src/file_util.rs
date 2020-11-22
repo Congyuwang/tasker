@@ -1,14 +1,16 @@
-use zip;
-use std::fs::File;
-use std::path::{PathBuf, Path};
 use crate::error::Error;
-use zip::ZipArchive;
+use std::fs::File;
+use std::path::{Path, PathBuf};
+use zip;
 use zip::result::ZipError;
+use zip::ZipArchive;
 
 pub fn decompress(zip_path: &str, out_dir: &str) -> Result<(), Error> {
     match decompress_inner(zip_path, out_dir) {
         Ok(_) => Ok(()),
-        Err(_) => Err(Error::DecompressionError("decompression failure".parse().unwrap()))
+        Err(_) => Err(Error::DecompressionError(
+            "decompression failure".parse().unwrap(),
+        )),
     }
 }
 
@@ -48,10 +50,14 @@ fn decompress_inner(zip_path: &str, out_dir: &str) -> Result<(), ZipError> {
 pub fn move_by_rename(from: &str, to: &str) -> Result<(), Error> {
     match move_by_rename_inner(from, to) {
         Ok(_) => Ok(()),
-        Err(e) => Err(Error::RenameError(format!("error moving from {} to {}: {}", from , to, e.to_string())))
+        Err(e) => Err(Error::RenameError(format!(
+            "error moving from {} to {}: {}",
+            from,
+            to,
+            e.to_string()
+        ))),
     }
 }
-
 
 fn move_by_rename_inner(from: &str, to: &str) -> Result<(), std::io::Error> {
     let from = std::path::Path::new(from);
@@ -63,7 +69,6 @@ fn move_by_rename_inner(from: &str, to: &str) -> Result<(), std::io::Error> {
     let input_root = PathBuf::from(&from).components().count();
 
     while let Some(working_path) = stack.pop() {
-
         // relative path
         let src: PathBuf = working_path.components().skip(input_root).collect();
 
@@ -97,27 +102,33 @@ fn move_by_rename_inner(from: &str, to: &str) -> Result<(), std::io::Error> {
     Ok(())
 }
 
-
 #[cfg(test)]
 mod util_test {
     use super::*;
 
     #[test]
     fn decompress_test() {
-        match decompress("/Users/congyuwang/Desktop/test_dir/zip.zip",
-                         "/Users/congyuwang/Desktop/test_dir/out") {
+        match decompress(
+            "/Users/congyuwang/Desktop/test_dir/zip.zip",
+            "/Users/congyuwang/Desktop/test_dir/out",
+        ) {
             Ok(_) => {}
-            Err(m) => {println!("{:?}", m)}
+            Err(m) => {
+                println!("{:?}", m)
+            }
         };
     }
 
     #[test]
     fn move_test() {
-        match move_by_rename("/Users/congyuwang/Desktop/test_dir/out/",
-                             "/Users/congyuwang/Desktop/out/") {
+        match move_by_rename(
+            "/Users/congyuwang/Desktop/test_dir/out/",
+            "/Users/congyuwang/Desktop/out/",
+        ) {
             Ok(_) => {}
-            Err(m) => {println!("{:?}", m)}
+            Err(m) => {
+                println!("{:?}", m)
+            }
         }
     }
 }
-

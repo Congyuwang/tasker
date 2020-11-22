@@ -1,4 +1,5 @@
 use crate::error::Error;
+use crate::DOMAIN_NAME;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -6,7 +7,6 @@ use std::io::{BufWriter, ErrorKind, IntoInnerError, Write};
 use std::path::Path;
 use std::string::FromUtf8Error;
 use std::string::ToString;
-use crate::DOMAIN_NAME;
 
 macro_rules! check_range_return_err {
     ($name: ident, $i: expr, $lo: expr, $hi: expr) => {
@@ -84,7 +84,7 @@ impl Configuration {
     pub fn from_yaml(yaml: &str) -> Result<Configuration, Error> {
         let mut config = match serde_yaml::from_str::<Configuration>(yaml) {
             Ok(config) => config,
-            Err(e) => return Err(Error::YamlError(e))
+            Err(e) => return Err(Error::YamlError(e)),
         }
         .check_label()?
         .check_program()?
@@ -128,8 +128,8 @@ impl Configuration {
     }
 
     fn serde_plist<T>(ser: &T) -> Result<String, FromUtf8Error>
-        where
-            T: Serialize,
+    where
+        T: Serialize,
     {
         let mut buf = Vec::new();
         plist::to_writer_xml(&mut buf, ser);
