@@ -1,9 +1,10 @@
 use crate::error::Error;
 use crate::launchctl::list;
-use actix_web::{get, post, web, App, HttpResponse, HttpServer, Responder, HttpRequest};
+use crate::TEMP_FOLDER;
 use actix_multipart::Multipart;
-use futures::{StreamExt, TryStreamExt};
 use actix_web::web::Query;
+use actix_web::{get, post, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use futures::{StreamExt, TryStreamExt};
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 
@@ -14,21 +15,22 @@ pub fn index() -> HttpResponse {
 }
 
 pub async fn save_file(mut payload: Multipart) -> Result<HttpResponse, actix_web::Error> {
-    // iterate over multipart stream
     while let Ok(Some(mut field)) = payload.try_next().await {
         let content_type = field.content_disposition().unwrap();
         let filename = content_type.get_filename().unwrap();
-        let filepath = format!("/Users/congyuwang/Desktop/tmp/{}", sanitize_filename::sanitize(&filename));
+        let filepath = format!(
+            "{} {}",
+            TEMP_FOLDER,
+            sanitize_filename::sanitize(&filename)
+        );
 
-        // File::create is blocking operation, use threadpool
+        // File::create is blocking operation, use thread-pool
         let mut f = web::block(|| std::fs::File::create(filepath))
             .await
             .unwrap();
 
-        // Field in turn is stream of *Bytes* object
         while let Some(chunk) = field.next().await {
             let data = chunk.unwrap();
-            // filesystem operations are blocking, we have to use threadpool
             f = web::block(move || f.write_all(&data).map(|_| f)).await?;
         }
     }
@@ -36,7 +38,7 @@ pub async fn save_file(mut payload: Multipart) -> Result<HttpResponse, actix_web
 }
 
 #[derive(Deserialize)]
-struct Label {
+pub struct Label {
     label: String,
 }
 
@@ -50,7 +52,7 @@ pub async fn list_all() -> impl Responder {
 }
 
 #[get("/list/{label}")]
-pub async fn list_filter(web::Path((label)): web::Path<(String)>) -> impl Responder {
+pub async fn list_filter(web::Path(label): web::Path<String>) -> impl Responder {
     let list_result = list(&label);
     match list_result {
         Ok(s) => HttpResponse::Ok().body(s),

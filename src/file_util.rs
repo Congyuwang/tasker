@@ -98,7 +98,7 @@ fn move_by_rename_inner(from: &str, to: &str) -> Result<(), std::io::Error> {
         }
     }
 
-    std::fs::remove_dir_all(from);
+    std::fs::remove_dir_all(from).unwrap();
 
     Ok(())
 }

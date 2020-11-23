@@ -82,7 +82,7 @@ impl Configuration {
 
     /// this function does checking, and removes duplicates to keep the last items
     pub fn from_yaml(yaml: &str) -> Result<Configuration, Error> {
-        let mut config = match serde_yaml::from_str::<Configuration>(yaml) {
+        let config = match serde_yaml::from_str::<Configuration>(yaml) {
             Ok(config) => config,
             Err(e) => return Err(Error::YamlError(e)),
         }
