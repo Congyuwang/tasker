@@ -60,6 +60,7 @@ pub fn move_by_rename(from: &str, to: &str) -> Result<(), Error> {
 }
 
 fn move_by_rename_inner(from: &str, to: &str) -> Result<(), std::io::Error> {
+    create_dir_check(&to);
     let from = std::path::Path::new(from);
     let to = std::path::Path::new(to);
     let mut stack = Vec::new();
