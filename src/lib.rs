@@ -4,7 +4,7 @@ extern crate lazy_static;
 extern crate strum_macros;
 
 static DOMAIN_NAME: &str = "com.tasker.tasks";
-static TEMP_FOLDER: &str = "/tmp";
+static TEMP_FOLDER: &str = "/tmp/";
 
 /// the config module provides api to convert task configuration to and from yaml and
 /// apple plist.

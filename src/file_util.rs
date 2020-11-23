@@ -16,7 +16,7 @@ pub fn decompress(zip_path: &str, out_dir: &str) -> Result<(), Error> {
 
 fn create_dir_check<P: AsRef<Path>>(dest: P) {
     if std::fs::metadata(&dest).is_err() {
-        std::fs::create_dir_all(&dest);
+        std::fs::create_dir_all(&dest).unwrap();
     }
 }
 
