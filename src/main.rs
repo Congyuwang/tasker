@@ -13,7 +13,7 @@ async fn main() -> std::io::Result<()> {
             .service(
                 web::resource("/")
                     .route(web::get().to(server::index))
-                    .route(web::post().to(server::upload)),
+                    .route(web::post().to(server::create_new_tasks)),
             )
     })
     .bind("127.0.0.1:54321")?

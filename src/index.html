@@ -47,6 +47,7 @@
 </head>
 <body>
 <h1>Task Management System</h1>
+
 <h2>Add New Task</h2>
 <p>
     Choose the zip file to upload:
@@ -58,9 +59,18 @@
     <button class="button button1" type="submit">Submit</button>
     <button class="button button3" type="reset">Clear</button>
 </form>
+
 <h2>List All Tasks</h2>
 <form onclick="location.href = '/list_all'">
     <button class="button button2" type="button">List all</button>
+</form>
+
+<h2>Search Tasks</h2>
+<form action="/list" method="get">
+    <label for="search_task">search for tasks using partial label name</label>
+    <br><br>
+    <input id="search_task" type="search" name="label" required>
+    <button type="submit">Search</button>
 </form>
 </body>
 </html>
