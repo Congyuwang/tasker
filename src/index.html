@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tasker</title>
+    <style>
+        .button {
+            border: none;
+            color: white;
+            padding: 10px 28px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            transition-duration: 0.4s;
+            cursor: pointer;
+        }
+        .button1 {
+            background-color: white;
+            color: black;
+            border: 2px solid #4caf50;
+        }
+        .button1:hover {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .button2 {
+            background-color: white;
+            color: black;
+            border: 2px solid #008CBA;
+        }
+        .button2:hover {
+            background-color: #008CBA;
+            color: white;
+        }
+    </style>
+</head>
+<body>
+<h1>Task Management System</h1>
+<h2>Add New Task</h2>
+<label for="upload">
+    Choose the zip file to upload:
+</label>
+<form target="/" method="post" enctype="multipart/form-data">
+    <input type="file" multiple name="file" id="upload" accept=".zip"/>
+    <br>
+    <br>
+    <button class="button button1" type="submit">Submit</button>
+</form>
+<h2>List All Tasks</h2>
+<form action="/list_all">
+    <button class="button button2" type="button">List all</button>
+</form>
+</body>
+</html>

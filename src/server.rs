@@ -7,18 +7,10 @@ use actix_web::web::Query;
 use serde::{Deserialize, Serialize};
 use std::io::Write;
 
-pub fn index() -> HttpResponse {
-    let html = r#"<html>
-        <head><title>Upload Test</title></head>
-        <body>
-            <form target="/" method="post" enctype="multipart/form-data">
-                <input type="file" multiple name="file"/>
-                <button type="submit">Submit</button>
-            </form>
-        </body>
-    </html>"#;
+static INDEX_HTML: &'static str = include_str!("index.html");
 
-    HttpResponse::Ok().body(html)
+pub fn index() -> HttpResponse {
+    HttpResponse::Ok().body(INDEX_HTML)
 }
 
 pub async fn save_file(mut payload: Multipart) -> Result<HttpResponse, actix_web::Error> {
