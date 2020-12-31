@@ -66,11 +66,19 @@
 </form>
 
 <h2>Search Tasks</h2>
-<form action="/list" method="get">
+<form action="./list" method="get">
     <label for="search_task">search for tasks using partial label name</label>
     <br><br>
     <input id="search_task" type="search" name="label" required>
     <button type="submit">Search</button>
+</form>
+
+<h2>Delete Tasks</h2>
+<form action="./delete" method="get">
+    <label for="delete_task">delete task</label>
+    <br><br>
+    <input id="delete_task" type="search" name="label" required>
+    <button type="submit">DELETE</button>
 </form>
 </body>
 </html>

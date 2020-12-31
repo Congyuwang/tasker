@@ -1,17 +1,18 @@
-use crate::error::Error;
-use crate::launchctl::list;
-use crate::TEMP_FOLDER;
-use actix_multipart::{Multipart, Field};
-use actix_web::middleware::errhandlers::ErrorHandlerResponse::Response;
+use crate::launchctl::{create_task, delete_task, list};
+use actix_multipart::{Field, Multipart};
+use actix_web::body::Body;
+use actix_web::http::StatusCode;
 use actix_web::web::Query;
-use actix_web::{get, post, web, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{get, web, HttpResponse, Responder};
 use futures::{StreamExt, TryStreamExt};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use std::io::Write;
+use std::path::Path;
 
 static INDEX_HTML: &'static str = include_str!("index.html");
 static MB_LIMIT: usize = 20;
 static SIZE_LIMIT: usize = MB_LIMIT * 1024 * 1024;
+static TEMP_ZIP: &str = "/tmp/tasker.task.temp.zip";
 
 pub fn index() -> HttpResponse {
     HttpResponse::Ok().body(INDEX_HTML)
@@ -24,16 +25,26 @@ pub async fn create_new_tasks(mut payload: Multipart) -> Result<HttpResponse, ac
     while let Ok(Some(mut field)) = payload.try_next().await {
         let content_type = field.content_disposition().unwrap();
         let filename = content_type.get_filename().unwrap();
-        let filepath = format!("{} {}", TEMP_FOLDER, sanitize_filename::sanitize(&filename));
-
-        save_single_file(&mut field, filename, filepath).await?;
+        if !filename.ends_with(".zip") {
+            let response = HttpResponse::new(StatusCode::BAD_REQUEST);
+            return Ok(response.set_body(Body::from("not a zip file")));
+        }
+        let filepath = Path::new(TEMP_ZIP);
+        save_single_zip(&mut field, filename).await?;
+        return match create_task(filepath) {
+            Ok(_) => Ok(HttpResponse::Ok().into()),
+            Err(e) => {
+                let response = HttpResponse::new(StatusCode::BAD_REQUEST);
+                Ok(response.set_body(Body::from(format!("fail to create task: {:?}", e))))
+            }
+        };
     }
     Ok(HttpResponse::Ok().into())
 }
 
-async fn save_single_file(field: &mut Field, filename: &str, filepath: String) -> Result<(), actix_web::Error> {
+async fn save_single_zip(field: &mut Field, filename: &str) -> Result<(), actix_web::Error> {
     // File::create is blocking operation, use thread-pool
-    let mut f = web::block(|| std::fs::File::create(filepath))
+    let mut f = web::block(|| std::fs::File::create(TEMP_ZIP))
         .await
         .unwrap();
 
@@ -42,10 +53,9 @@ async fn save_single_file(field: &mut Field, filename: &str, filepath: String) -
         let data = chunk.unwrap();
         size += data.len();
         if size > SIZE_LIMIT {
-            return Err(actix_web::Error::from(
-                HttpResponse::Forbidden()
-                    .body(format!("{} size too big: exceeds {} mb", filename, MB_LIMIT)),
-            ));
+            return Err(actix_web::Error::from(HttpResponse::Forbidden().body(
+                format!("{} size too big: exceeds {} mb", filename, MB_LIMIT),
+            )));
         }
         f = web::block(move || f.write_all(&data).map(|_| f)).await?;
     }
@@ -66,20 +76,20 @@ pub async fn list_all() -> impl Responder {
     }
 }
 
-#[get("/list/{label}")]
-pub async fn list_filter(web::Path(label): web::Path<String>) -> impl Responder {
-    let list_result = list(&label);
+#[get("/list")]
+pub async fn list_param(param: Query<Label>) -> impl Responder {
+    let list_result = list(&param.label);
     match list_result {
         Ok(s) => HttpResponse::Ok().body(s),
         Err(e) => HttpResponse::InternalServerError().body(format!("{:?}", e)),
     }
 }
 
-#[get("/list")]
-pub async fn list_param(param: Query<Label>) -> impl Responder {
-    let list_result = list(&param.label);
-    match list_result {
-        Ok(s) => HttpResponse::Ok().body(s),
+#[get("/delete")]
+pub async fn delete_param(param: Query<Label>) -> impl Responder {
+    let delete_result = delete_task(&param.label);
+    match delete_result {
+        Ok(_) => HttpResponse::Ok().body(""),
         Err(e) => HttpResponse::InternalServerError().body(format!("{:?}", e)),
     }
 }

@@ -1,9 +1,8 @@
 use crate::error::Error;
-use crate::DOMAIN_NAME;
+use crate::TASKER_TASK_NAME;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use std::io::{BufWriter, ErrorKind, IntoInnerError, Write};
 use std::path::Path;
 use std::string::FromUtf8Error;
 use std::string::ToString;
@@ -40,7 +39,7 @@ macro_rules! check_option_range_return_err {
 #[derive(Deserialize, Serialize, Debug, PartialEq)]
 pub struct Configuration {
     #[serde(rename = "Label")]
-    label: String,
+    pub label: String,
     #[serde(rename = "Program")]
     program: String,
     #[serde(rename = "Configuration")]
@@ -84,7 +83,7 @@ impl Configuration {
     pub fn from_yaml(yaml: &str) -> Result<Configuration, Error> {
         let config = match serde_yaml::from_str::<Configuration>(yaml) {
             Ok(config) => config,
-            Err(e) => return Err(Error::YamlError(e)),
+            Err(e) => return Err(Error::YamlError(e.to_string())),
         }
         .check_label()?
         .check_program()?
@@ -100,7 +99,7 @@ impl Configuration {
     pub fn to_yaml(&self) -> serde_yaml::Result<String> {
         let yaml = serde_yaml::to_string(self)?;
         let mut result = Vec::new();
-        let label_line = String::from("Label: ") + DOMAIN_NAME + ".";
+        let label_line = String::from("Label: ") + TASKER_TASK_NAME + ".";
         for y in yaml.lines() {
             if y.starts_with(&label_line) {
                 result.push(y.replace(&label_line, "Label: "));
@@ -132,7 +131,8 @@ impl Configuration {
         T: Serialize,
     {
         let mut buf = Vec::new();
-        plist::to_writer_xml(&mut buf, ser);
+        plist::to_writer_xml(&mut buf, ser)
+            .expect("inner error (function: serde_plist)");
         String::from_utf8(buf)
     }
 
@@ -153,9 +153,12 @@ impl Configuration {
         Ok(self)
     }
 
+    ///
+    /// label only allows patterns as follows `[A-Za-z]+(\\.[A-Za-z]+)*`.
+    ///
     fn check_label(self) -> Result<Configuration, Error> {
         lazy_static! {
-            static ref LABEL_REGEX: Regex = Regex::new("[a-z]+(\\.[a-z]+)*").unwrap();
+            static ref LABEL_REGEX: Regex = Regex::new("[A-Za-z]+(\\.[A-Za-z]+)*").unwrap();
         }
         if !LABEL_REGEX.is_match(&self.label) {
             return Err(Error::ConfigLabelError(format!(
@@ -167,7 +170,7 @@ impl Configuration {
     }
 
     fn append_domain(mut self) -> Configuration {
-        self.label = String::from(DOMAIN_NAME) + "." + &self.label;
+        self.label = String::from(TASKER_TASK_NAME) + "." + &self.label;
         self
     }
 }
@@ -195,7 +198,7 @@ impl Config {
     pub fn from_yaml(yaml: &str) -> Result<Config, Error> {
         match serde_yaml::from_str::<Config>(yaml) {
             Ok(config) => config.check(),
-            Err(e) => Err(Error::YamlError(e)),
+            Err(e) => Err(Error::YamlError(e.to_string())),
         }
     }
 
@@ -602,7 +605,7 @@ mod test_config_mod {
             + "<dict>\n"
             + "\t<key>Label</key>\n"
             + "\t<string>"
-            + &DOMAIN_NAME
+            + &TASKER_TASK_NAME
             + "."
             + "test_task</string>\n"
             + "\t<key>Program</key>\n"

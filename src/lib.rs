@@ -3,13 +3,14 @@ extern crate lazy_static;
 #[macro_use]
 extern crate strum_macros;
 
-static DOMAIN_NAME: &str = "com.tasker.tasks";
-static TEMP_FOLDER: &str = "/tmp/";
+static TASKER_TASK_NAME: &str = "com.tasker.tasks";
+static PLIST_FOLDER: &str = "/Library/LaunchDaemons/";
 
 /// the config module provides api to convert task configuration to and from yaml and
 /// apple plist.
 mod config;
 mod error;
-mod file_util;
+pub mod initialize;
 mod launchctl;
 pub mod server;
+mod utils;

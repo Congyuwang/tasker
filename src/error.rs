@@ -1,8 +1,7 @@
-use std::{io, string};
-
 #[derive(Debug)]
 pub enum Error {
-    YamlError(serde_yaml::Error),
+    YamlError(String),
+    YamlNotFound(String),
     ConfigRangeError(String),
     ConfigPathError(String),
     ConfigLabelError(String),
@@ -10,4 +9,12 @@ pub enum Error {
     LaunchctlListError(String),
     DecompressionError(String),
     RenameError(String),
+    IllegalDomainName(String),
+    NonUtfError(String),
+    ErrorCreatingFolder(String),
+    ErrorCreatingPlist(String),
+    ErrorCopyYamlToMeta(String),
+    NoFileToDelete(String),
+    FailedToLoadTask(String),
+    FailedToUnloadTask(String),
 }
