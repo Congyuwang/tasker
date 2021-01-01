@@ -5,7 +5,7 @@ use crate::utils::{
     create_dir_check, create_file_check, decompress, delete_file_check, move_by_rename,
     read_utf8_file,
 };
-use crate::{PLIST_FOLDER, TASKER_TASK_NAME};
+use crate::{PLIST_FOLDER, TASKER_TASK_NAME, TEMP_UNZIP_FOLDER};
 use serde::Serialize;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -63,79 +63,75 @@ pub fn delete_task(task_label: &str) -> Result<(), Error> {
 }
 
 pub fn create_task(task_zip: &Path) -> Result<(), Error> {
-    if let Some(file_stem) = task_zip.file_stem() {
-        decompress(task_zip, file_stem.as_ref())?;
-        let unzipped_folder = Path::new(file_stem);
-        let yaml = get_yaml(unzipped_folder)?;
+    let unzip_folder = Path::new(TEMP_UNZIP_FOLDER);
+    decompress(&task_zip, Path::new(TEMP_UNZIP_FOLDER))?;
+    let yaml = get_yaml(&unzip_folder)?;
 
-        return if let Ok(yaml_content) = read_utf8_file(&yaml) {
-            let mut config = Configuration::from_yaml(&yaml_content)?;
+    return if let Ok(yaml_content) = read_utf8_file(&yaml) {
+        let mut config = Configuration::from_yaml(&yaml_content)?;
 
-            // attempt to create task and output folder
-            let task_folder_name = get_task_folder_name(&config.label);
-            let task_output_name = get_output_folder_name(&config.label);
-            create_dir_check(&task_folder_name)?;
-            create_dir_check(&task_output_name)?;
+        // attempt to create task and output folder
+        let task_folder_name = get_task_folder_name(&config.label);
+        let task_output_name = get_output_folder_name(&config.label);
+        create_dir_check(&task_folder_name)?;
+        create_dir_check(&task_output_name)?;
 
-            // create stdout and stderr files
-            if let Some(std_out_file) = task_output_name.join("stdout.log").to_str() {
-                create_file_check(std_out_file)?;
-                config = config.add_config(Config::StandardOutPath(std_out_file.to_string()));
-            } else {
-                return Err(Error::NonUtfError(
-                    "non-utf8 character not supported in stdout/stderr path".to_string(),
-                ));
+        // create stdout and stderr files
+        if let Some(std_out_file) = task_output_name.join("stdout.log").to_str() {
+            create_file_check(std_out_file)?;
+            config = config.add_config(Config::StandardOutPath(std_out_file.to_string()));
+        } else {
+            return Err(Error::NonUtfError(
+                "non-utf8 character not supported in stdout/stderr path".to_string(),
+            ));
+        }
+        if let Some(std_err_file) = task_output_name.join("stderr.log").to_str() {
+            create_file_check(std_err_file)?;
+            config = config.add_config(Config::StandardErrorPath(std_err_file.to_string()));
+        } else {
+            return Err(Error::NonUtfError(
+                "non-utf8 character not supported in stdout/stderr path".to_string(),
+            ));
+        }
+
+        // copy yaml to meta folder
+        match std::fs::copy(
+            &yaml,
+            get_environment()
+                .unwrap()
+                .meta_dir
+                .join(String::from(&config.label) + ".yaml")
+                .as_path(),
+        ) {
+            Ok(_) => {}
+            Err(_) => {
+                return Err(Error::ErrorCopyYamlToMeta(
+                    "error writing plist".to_string(),
+                ))
             }
-            if let Some(std_err_file) = task_output_name.join("stderr.log").to_str() {
-                create_file_check(std_err_file)?;
-                config = config.add_config(Config::StandardErrorPath(std_err_file.to_string()));
-            } else {
-                return Err(Error::NonUtfError(
-                    "non-utf8 character not supported in stdout/stderr path".to_string(),
-                ));
-            }
+        }
 
-            // copy yaml to meta folder
-            match std::fs::copy(
-                &yaml,
-                get_environment()
-                    .unwrap()
-                    .meta_dir
-                    .join(String::from(&config.label) + ".yaml")
-                    .as_path(),
-            ) {
-                Ok(_) => {}
-                Err(_) => {
-                    return Err(Error::ErrorCopyYamlToMeta(
-                        "error writing plist".to_string(),
-                    ))
-                }
-            }
+        // move the files to task folder
+        move_by_rename(&unzip_folder, task_folder_name.as_path())?;
 
-            // move the files to task folder
-            move_by_rename(&unzipped_folder, task_folder_name.as_path())?;
-
-            // place plist
-            let plist = config.to_plist();
-            if let Ok(mut plist_file) = std::fs::File::create(get_plist_path(&config.label)) {
-                match plist_file.write_all(plist.as_ref()) {
-                    Ok(_) => {
-                        load_task(&config.label)?;
-                        Ok(())
-                    },
-                    Err(_) => Err(Error::ErrorCreatingPlist("error writing plist".to_string())),
-                }
-            } else {
-                Err(Error::ErrorCreatingPlist("cannot create plist".to_string()))
+        // place plist
+        let plist = config.to_plist();
+        if let Ok(mut plist_file) = std::fs::File::create(get_plist_path(&config.label)) {
+            match plist_file.write_all(plist.as_ref()) {
+                Ok(_) => {
+                    load_task(&config.label)?;
+                    Ok(())
+                },
+                Err(_) => Err(Error::ErrorCreatingPlist("error writing plist".to_string())),
             }
         } else {
-            Err(Error::YamlError(
-                "error reading yaml as utf8 text".to_string(),
-            ))
-        };
+            Err(Error::ErrorCreatingPlist("cannot create plist".to_string()))
+        }
     } else {
-    }
-    Ok(())
+        Err(Error::YamlError(
+            "error reading yaml as utf8 text".to_string(),
+        ))
+    };
 }
 
 pub fn get_yaml(unzipped_folder: &Path) -> Result<PathBuf, Error> {

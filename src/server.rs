@@ -42,6 +42,9 @@ pub async fn create_new_tasks(mut payload: Multipart) -> Result<HttpResponse, ac
     Ok(HttpResponse::Ok().into())
 }
 
+///
+/// this function saves the zip to TEMP_ZIP location
+///
 async fn save_single_zip(field: &mut Field, filename: &str) -> Result<(), actix_web::Error> {
     // File::create is blocking operation, use thread-pool
     let mut f = web::block(|| std::fs::File::create(TEMP_ZIP))
