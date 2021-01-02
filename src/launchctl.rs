@@ -78,7 +78,6 @@ pub fn create_task(task_zip: &Path) -> Result<(), Error> {
 
         // create stdout and stderr files
         if let Some(std_out_file) = task_output_name.join("stdout.log").to_str() {
-            create_file_check(std_out_file)?;
             config = config.add_config(Config::StandardOutPath(std_out_file.to_string()));
         } else {
             return Err(Error::NonUtfError(
@@ -86,7 +85,6 @@ pub fn create_task(task_zip: &Path) -> Result<(), Error> {
             ));
         }
         if let Some(std_err_file) = task_output_name.join("stderr.log").to_str() {
-            create_file_check(std_err_file)?;
             config = config.add_config(Config::StandardErrorPath(std_err_file.to_string()));
         } else {
             return Err(Error::NonUtfError(
