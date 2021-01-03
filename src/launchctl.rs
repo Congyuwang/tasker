@@ -45,19 +45,35 @@ pub fn unload_task(task_label: &str) -> Result<String, Error> {
         .args(&["unload", get_plist_path(task_label).to_str().unwrap_or_default(), ]))
 }
 
+///
+/// ignore most failure in this function so as not to be interrupted
+/// during deletion.
+///
 pub fn delete_task(task_label: &str) -> Result<(), Error> {
-    unload_task(task_label)?;
-    delete_file_check(get_plist_path(task_label))?;
+    match unload_task(task_label) {
+        Ok(_) => {}
+        Err(_) => {}
+    };
+    match delete_file_check(get_plist_path(task_label)) {
+        Ok(_) => {}
+        Err(_) => {}
+    };
     // move 'task' folder to trash
-    move_by_rename(
+    match move_by_rename(
         get_task_folder_name(task_label).as_path(),
         get_trash_folder_name(task_label).as_path(),
-    )?;
+    ) {
+        Ok(_) => {}
+        Err(_) => {}
+    };
     // move 'out' folder to trash
-    move_by_rename(
+    match move_by_rename(
         get_output_folder_name(task_label).as_path(),
         get_trash_folder_name(task_label).join("out").as_path(),
-    )?;
+    ) {
+        Ok(_) => {}
+        Err(_) => {}
+    };
     Ok(())
 }
 
