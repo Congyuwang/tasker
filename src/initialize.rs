@@ -1,7 +1,6 @@
 use crate::error::Error;
 use crate::utils;
 use regex::Regex;
-use std::env::VarError;
 use std::path::{Path, PathBuf};
 
 pub struct Env {
