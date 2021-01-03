@@ -18,4 +18,5 @@ pub enum Error {
     FailedToLoadTask(String),
     FailedToUnloadTask(String),
     FailedToReplaceRootAlias(String),
+    CommandExecutionError(String),
 }
