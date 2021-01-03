@@ -152,23 +152,6 @@ pub fn create_task(task_zip: &Path) -> Result<(), Error> {
             ));
         }
 
-        // copy yaml to meta folder
-        match std::fs::copy(
-            &yaml,
-            get_environment()
-                .unwrap()
-                .meta_dir
-                .join(String::from(label) + ".yaml")
-                .as_path(),
-        ) {
-            Ok(_) => {}
-            Err(_) => {
-                return Err(Error::ErrorCopyYamlToMeta(
-                    "error writing plist".to_string(),
-                ))
-            }
-        }
-
         // move the files to task folder
         move_by_rename(&unzip_folder, task_folder_name.as_path())?;
 

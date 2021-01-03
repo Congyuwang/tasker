@@ -2,7 +2,7 @@
     - upload and create tasks, delete tasks.
 [0.1.1]
     - delete 'out' folder when deleting tasks.
-    - add 'upload' and 'load'.
+    - add 'unload' and 'load'.
 [0.1.2]
     - add '{root}' alias in program arguments.
     - check load status for 'load' and 'unload'
