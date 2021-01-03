@@ -3,8 +3,8 @@ use crate::config::{Config, Configuration};
 use crate::error::Error;
 use crate::initialize::get_environment;
 use crate::utils::{
-    create_dir_check, decompress, delete_file_check, move_by_rename, read_utf8_file,
-    execute_command
+    create_dir_check, decompress, delete_file_check, execute_command, move_by_rename,
+    read_utf8_file,
 };
 use crate::{PLIST_FOLDER, TASKER_TASK_NAME, TASK_ROOT_ALIAS, TEMP_UNZIP_FOLDER};
 use serde::Serialize;
@@ -36,13 +36,27 @@ fn get_trash_folder_name(label_name: &str) -> PathBuf {
 }
 
 pub fn load_task(task_label: &str) -> Result<String, Error> {
-    execute_command(Command::new("launchctl")
-        .args(&["load", get_plist_path(task_label).to_str().unwrap_or_default(), ]))
+    if is_loaded(task_label)? {
+        return Err(Error::FailedToUnloadTask(
+            "task is already loaded".to_string(),
+        ));
+    }
+    execute_command(Command::new("launchctl").args(&[
+        "load",
+        get_plist_path(task_label).to_str().unwrap_or_default(),
+    ]))
 }
 
 pub fn unload_task(task_label: &str) -> Result<String, Error> {
-    execute_command(Command::new("launchctl")
-        .args(&["unload", get_plist_path(task_label).to_str().unwrap_or_default(), ]))
+    if !is_loaded(task_label)? {
+        return Err(Error::FailedToUnloadTask(
+            "task is already unloaded".to_string(),
+        ));
+    }
+    execute_command(Command::new("launchctl").args(&[
+        "unload",
+        get_plist_path(task_label).to_str().unwrap_or_default(),
+    ]))
 }
 
 ///
@@ -77,7 +91,7 @@ pub fn delete_task(task_label: &str) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn replace_task_root(config: &mut Configuration, task_label: &str) -> Result<(), Error> {
+pub fn replace_task_root_alias(config: &mut Configuration, task_label: &str) -> Result<(), Error> {
     let configuration = &mut config.configuration;
     let task_folder = get_task_folder_name(task_label);
     for conf in configuration {
@@ -109,7 +123,7 @@ pub fn create_task(task_zip: &Path) -> Result<(), Error> {
     return if let Ok(yaml_content) = read_utf8_file(&yaml) {
         let mut config = Configuration::from_yaml(&yaml_content)?;
         let label = &config.label.clone();
-        replace_task_root(&mut config, label)?;
+        replace_task_root_alias(&mut config, label)?;
 
         // attempt to create task and output folder
         let task_folder_name = get_task_folder_name(label);
@@ -194,26 +208,33 @@ pub fn get_yaml(unzipped_folder: &Path) -> Result<PathBuf, Error> {
     };
 }
 
-pub fn list(label_pattern: &str) -> Result<String, Error> {
-    let list_output = list_inner();
-    let list_output = match list_output {
-        Ok(o) => o,
-        Err(_) => {
-            return Err(Error::LaunchctlListError(
-                "failed to list file".parse().unwrap(),
-            ))
+pub fn list_inner(label_pattern: &str) -> Result<Vec<TaskInfo>, Error> {
+    match execute_command(Command::new("launchctl").arg("list")) {
+        Ok(list_output) => {
+            let task_info = TaskInfo::from_str_filter(&list_output, label_pattern);
+            Ok(task_info)
         }
-    };
-    if !list_output.status.success() {
-        return Err(Error::LaunchctlListError(format!(
-            "failed to list file: {}",
-            std::str::from_utf8(&list_output.stderr).unwrap()
-        )));
-    };
-    let task_info = TaskInfo::from_str_filter(
-        std::str::from_utf8(&list_output.stdout).unwrap(),
-        label_pattern,
-    );
+        Err(e) => {
+            return Err(Error::LaunchctlListError(format!(
+                "failed to list file: {:?}",
+                e
+            )));
+        }
+    }
+}
+
+pub fn is_loaded(label_pattern: &str) -> Result<bool, Error> {
+    let task_list = list_inner(label_pattern)?;
+    for t in task_list {
+        if t.label.eq(label_pattern) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+pub fn list(label_pattern: &str) -> Result<String, Error> {
+    let task_info = list_inner(label_pattern)?;
     match serde_json::to_string_pretty(&task_info) {
         Ok(s) => Ok(s),
         Err(_) => {
@@ -222,10 +243,6 @@ pub fn list(label_pattern: &str) -> Result<String, Error> {
             ))
         }
     }
-}
-
-fn list_inner() -> std::io::Result<Output> {
-    Command::new("launchctl").arg("list").output()
 }
 
 impl TaskInfo {
