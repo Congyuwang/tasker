@@ -1,4 +1,4 @@
-use crate::launchctl::{create_task, delete_task, list};
+use crate::launchctl::{create_task, delete_task, list, load_task, unload_task};
 use actix_multipart::{Field, Multipart};
 use actix_web::body::Body;
 use actix_web::http::StatusCode;
@@ -39,7 +39,7 @@ pub async fn create_new_tasks(mut payload: Multipart) -> Result<HttpResponse, ac
             }
         };
     }
-    Ok(HttpResponse::Ok().into())
+    Ok(HttpResponse::Ok().body("Successfully added task"))
 }
 
 ///
@@ -93,6 +93,24 @@ pub async fn delete_param(param: Query<Label>) -> impl Responder {
     let delete_result = delete_task(&param.label);
     match delete_result {
         Ok(_) => HttpResponse::Ok().body(""),
+        Err(e) => HttpResponse::InternalServerError().body(format!("{:?}", e)),
+    }
+}
+
+#[get("/load")]
+pub async fn load_param(param: Query<Label>) -> impl Responder {
+    let load_task = load_task(&param.label);
+    match load_task {
+        Ok(_) => HttpResponse::Ok().body("Successfully loaded task"),
+        Err(e) => HttpResponse::InternalServerError().body(format!("{:?}", e)),
+    }
+}
+
+#[get("/unload")]
+pub async fn unload_param(param: Query<Label>) -> impl Responder {
+    let unload_task = unload_task(&param.label);
+    match unload_task {
+        Ok(_) => HttpResponse::Ok().body("Successfully unloaded task"),
         Err(e) => HttpResponse::InternalServerError().body(format!("{:?}", e)),
     }
 }
