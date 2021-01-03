@@ -1,10 +1,11 @@
+use crate::config::Config::ProgramArguments;
 use crate::config::{Config, Configuration};
 use crate::error::Error;
 use crate::initialize::get_environment;
 use crate::utils::{
     create_dir_check, decompress, delete_file_check, move_by_rename, read_utf8_file,
 };
-use crate::{PLIST_FOLDER, TASKER_TASK_NAME, TEMP_UNZIP_FOLDER};
+use crate::{PLIST_FOLDER, TASKER_TASK_NAME, TASK_ROOT_ALIAS, TEMP_UNZIP_FOLDER};
 use serde::Serialize;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -81,6 +82,30 @@ pub fn delete_task(task_label: &str) -> Result<(), Error> {
     Ok(())
 }
 
+pub fn replace_task_root(config: &mut Configuration, task_label: &str) -> Result<(), Error> {
+    let configuration = &mut config.configuration;
+    let task_folder = get_task_folder_name(task_label);
+    for conf in configuration {
+        if let ProgramArguments(arguments) = conf {
+            for arg in arguments {
+                if arg.starts_with(TASK_ROOT_ALIAS) {
+                    let path_removed_alias = arg.replacen(TASK_ROOT_ALIAS, "", 1);
+                    let alias_replaced = task_folder.join(path_removed_alias);
+                    if let Some(new_arg) = alias_replaced.to_str() {
+                        *arg = new_arg.to_string();
+                    } else {
+                        return Err(Error::FailedToReplaceRootAlias(
+                            "failed to replace root folder, do not use non-utf-8 character in path"
+                                .to_string(),
+                        ));
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
 pub fn create_task(task_zip: &Path) -> Result<(), Error> {
     let unzip_folder = Path::new(TEMP_UNZIP_FOLDER);
     decompress(&task_zip, Path::new(TEMP_UNZIP_FOLDER))?;
@@ -88,10 +113,12 @@ pub fn create_task(task_zip: &Path) -> Result<(), Error> {
 
     return if let Ok(yaml_content) = read_utf8_file(&yaml) {
         let mut config = Configuration::from_yaml(&yaml_content)?;
+        let label = &config.label.clone();
+        replace_task_root(&mut config, label)?;
 
         // attempt to create task and output folder
-        let task_folder_name = get_task_folder_name(&config.label);
-        let task_output_name = get_output_folder_name(&config.label);
+        let task_folder_name = get_task_folder_name(label);
+        let task_output_name = get_output_folder_name(label);
         create_dir_check(&task_folder_name)?;
         create_dir_check(&task_output_name)?;
 
@@ -117,7 +144,7 @@ pub fn create_task(task_zip: &Path) -> Result<(), Error> {
             get_environment()
                 .unwrap()
                 .meta_dir
-                .join(String::from(&config.label) + ".yaml")
+                .join(String::from(label) + ".yaml")
                 .as_path(),
         ) {
             Ok(_) => {}
@@ -133,12 +160,12 @@ pub fn create_task(task_zip: &Path) -> Result<(), Error> {
 
         // place plist
         let plist = config.to_plist();
-        if let Ok(mut plist_file) = std::fs::File::create(get_plist_path(&config.label)) {
+        if let Ok(mut plist_file) = std::fs::File::create(get_plist_path(label)) {
             match plist_file.write_all(plist.as_ref()) {
                 Ok(_) => {
-                    load_task(&config.label)?;
+                    load_task(label)?;
                     Ok(())
-                },
+                }
                 Err(_) => Err(Error::ErrorCreatingPlist("error writing plist".to_string())),
             }
         } else {

@@ -43,7 +43,7 @@ pub struct Configuration {
     #[serde(rename = "Program")]
     program: String,
     #[serde(rename = "Configuration")]
-    configuration: Vec<Config>,
+    pub configuration: Vec<Config>,
 }
 
 impl Configuration {
@@ -131,8 +131,7 @@ impl Configuration {
         T: Serialize,
     {
         let mut buf = Vec::new();
-        plist::to_writer_xml(&mut buf, ser)
-            .expect("inner error (function: serde_plist)");
+        plist::to_writer_xml(&mut buf, ser).expect("inner error (function: serde_plist)");
         String::from_utf8(buf)
     }
 

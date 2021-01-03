@@ -17,4 +17,5 @@ pub enum Error {
     NoFileToDelete(String),
     FailedToLoadTask(String),
     FailedToUnloadTask(String),
+    FailedToReplaceRootAlias(String),
 }
