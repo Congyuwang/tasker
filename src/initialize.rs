@@ -73,7 +73,10 @@ impl Env {
     /// The domain name part should not start or end with dash (-) (e.g. -google-.com)
     /// The domain name part should be between 1 and 63 characters long
     fn check_domain_name(domain: &str) -> Result<&str, Error> {
-        if Regex::new(DOMAIN_RE).unwrap().is_match(domain) {
+        lazy_static! {
+            static ref DOMAIN_REGEX: Regex = Regex::new(DOMAIN_RE).unwrap();
+        }
+        if DOMAIN_REGEX.is_match(domain) {
             Ok(domain)
         } else {
             Err(Error::IllegalDomainName(

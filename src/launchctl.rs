@@ -10,7 +10,7 @@ use crate::{PLIST_FOLDER, TASKER_TASK_NAME, TASK_ROOT_ALIAS, TEMP_UNZIP_FOLDER};
 use serde::Serialize;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
+use std::process::Command;
 
 #[derive(Debug, Serialize)]
 pub struct TaskInfo {
@@ -85,6 +85,15 @@ pub fn delete_task(task_label: &str) -> Result<(), Error> {
         get_output_folder_name(task_label).as_path(),
         get_trash_folder_name(task_label).join("out").as_path(),
     ) {
+        Ok(_) => {}
+        Err(_) => {}
+    };
+    // remove yaml in meta
+    match std::fs::remove_file(get_environment()
+        .unwrap()
+        .meta_dir
+        .join(String::from(task_label) + ".yaml")
+        .as_path()) {
         Ok(_) => {}
         Err(_) => {}
     };

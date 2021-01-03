@@ -7,6 +7,8 @@ use std::path::Path;
 use std::string::FromUtf8Error;
 use std::string::ToString;
 
+static LABEL_REG: &str = "^[A-Za-z_]+(\\.[A-Za-z_]+)*$";
+
 macro_rules! check_range_return_err {
     ($name: ident, $i: expr, $lo: expr, $hi: expr) => {
         if $i < $lo || $i > $hi {
@@ -157,7 +159,7 @@ impl Configuration {
     ///
     fn check_label(self) -> Result<Configuration, Error> {
         lazy_static! {
-            static ref LABEL_REGEX: Regex = Regex::new("[A-Za-z]+(\\.[A-Za-z]+)*").unwrap();
+            static ref LABEL_REGEX: Regex = Regex::new(LABEL_REG).unwrap();
         }
         if !LABEL_REGEX.is_match(&self.label) {
             return Err(Error::ConfigLabelError(format!(
