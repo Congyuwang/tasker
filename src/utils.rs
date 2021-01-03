@@ -2,8 +2,8 @@ use crate::error::Error;
 use std::fs::File;
 use std::io::Read;
 use std::path::{Path, PathBuf};
-use zip;
 use std::process::Command;
+use zip;
 
 pub fn create_dir_check<P: AsRef<Path>>(dest: P) -> Result<(), Error> {
     if std::fs::metadata(&dest).is_err() {
@@ -56,12 +56,14 @@ pub fn execute_command(command: &mut Command) -> Result<String, Error> {
         return Err(Error::CommandExecutionError(format!(
             "failed to execute command: {}",
             std::str::from_utf8(&output.stderr).unwrap()
-        )))
+        )));
     };
     if let Ok(output) = std::str::from_utf8(&output.stdout) {
         Ok(output.to_string())
     } else {
-        Err(Error::CommandExecutionError("non-utf8 output not supported".to_string()))
+        Err(Error::CommandExecutionError(
+            "non-utf8 output not supported".to_string(),
+        ))
     }
 }
 
