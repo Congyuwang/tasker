@@ -89,11 +89,13 @@ pub fn delete_task(task_label: &str) -> Result<(), Error> {
         Err(_) => {}
     };
     // remove yaml in meta
-    match std::fs::remove_file(get_environment()
-        .unwrap()
-        .meta_dir
-        .join(String::from(task_label) + ".yaml")
-        .as_path()) {
+    match std::fs::remove_file(
+        get_environment()
+            .unwrap()
+            .meta_dir
+            .join(String::from(task_label) + ".yaml")
+            .as_path(),
+    ) {
         Ok(_) => {}
         Err(_) => {}
     };

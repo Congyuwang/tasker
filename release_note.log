@@ -7,3 +7,6 @@
     - add '{root}' alias in program arguments.
     - check load status for 'load' and 'unload'
     - unload loaded task before covering with 'create'
+[0.1.3]
+    - add SSL support
+    - add login support

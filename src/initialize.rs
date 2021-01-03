@@ -1,7 +1,8 @@
 use crate::error::Error;
 use crate::utils;
 use regex::Regex;
-use std::path::PathBuf;
+use std::env::VarError;
+use std::path::{Path, PathBuf};
 
 pub struct Env {
     domain: String,
@@ -12,6 +13,8 @@ pub struct Env {
     pub trash_dir: PathBuf,
     pub task_dir: PathBuf,
     pub out_dir: PathBuf,
+    pub pk_dir: Option<PathBuf>,
+    pub crt_dir: Option<PathBuf>,
 }
 
 static mut ENVIRONMENT: Option<Env> = None;
@@ -36,6 +39,14 @@ impl Env {
         std::env::set_var("RUST_LOG", "actix_server=info,actix_web=info");
         // check or create folders
         let tasker_root = std::env::var("TASKER_ROOT").expect("TASKER_ROOT not found in Env");
+        let pk_dir = match std::env::var("SSL_PRIVATE_KEY") {
+            Ok(d) => Some(Path::new(&d).to_owned()),
+            Err(_) => None,
+        };
+        let crt_dir = match std::env::var("SSL_CERTIFICATE") {
+            Ok(d) => Some(Path::new(&d).to_owned()),
+            Err(_) => None,
+        };
         let tasker_root = std::path::Path::new(&tasker_root).to_owned();
         let meta_dir = tasker_root.join(META_FOLDER);
         let trash_dir = tasker_root.join(TRASH_FOLDER);
@@ -66,6 +77,8 @@ impl Env {
             task_dir,
             out_dir,
             meta_file,
+            pk_dir,
+            crt_dir,
         }
     }
 
