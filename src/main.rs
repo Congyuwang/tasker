@@ -14,12 +14,15 @@ async fn main() -> std::io::Result<()> {
                 CookieIdentityPolicy::new(&key)
                     .max_age(60 * 20)
                     .name("auth-cookie")
+                    .path("/")
                     .secure(false),
             ))
             .wrap(middleware::Logger::default())
             .service(server::list_all)
             .service(server::list_param)
             .service(server::delete_param)
+            .service(server::load_param)
+            .service(server::unload_param)
             .service(
                 web::resource("/")
                     .route(web::get().to(server::index))

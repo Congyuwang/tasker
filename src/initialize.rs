@@ -47,7 +47,7 @@ impl Env {
         utils::create_dir_check(&task_dir).expect("failed to create task_dir");
         utils::create_dir_check(&out_dir).expect("failed to create out_dir");
         let meta_file = meta_dir.join(META_FILE).to_owned();
-        std::fs::File::create(&meta_file).expect("failed to create meta file");
+        utils::create_file_check(&meta_file).expect("failed to create meta file");
 
         // check domain and port number
         let domain: String = std::env::var("DOMAIN").unwrap_or_else(|_| "localhost".to_string());

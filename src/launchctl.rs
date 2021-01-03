@@ -2,8 +2,7 @@ use crate::config::{Config, Configuration};
 use crate::error::Error;
 use crate::initialize::get_environment;
 use crate::utils::{
-    create_dir_check, create_file_check, decompress, delete_file_check, move_by_rename,
-    read_utf8_file,
+    create_dir_check, decompress, delete_file_check, move_by_rename, read_utf8_file,
 };
 use crate::{PLIST_FOLDER, TASKER_TASK_NAME, TEMP_UNZIP_FOLDER};
 use serde::Serialize;
@@ -36,28 +35,48 @@ fn get_trash_folder_name(label_name: &str) -> PathBuf {
 
 pub fn load_task(task_label: &str) -> Result<(), Error> {
     return match Command::new("launchctl")
-        .args(&["load", get_plist_path(task_label).to_str().unwrap_or_default()])
-        .output() {
+        .args(&[
+            "load",
+            get_plist_path(task_label).to_str().unwrap_or_default(),
+        ])
+        .output()
+    {
         Ok(_) => Ok(()),
-        Err(_) => Err(Error::FailedToLoadTask(format!("failed to load {}", task_label)))
-    }
+        Err(_) => Err(Error::FailedToLoadTask(format!(
+            "failed to load {}",
+            task_label
+        ))),
+    };
 }
 
 pub fn unload_task(task_label: &str) -> Result<(), Error> {
     return match Command::new("launchctl")
-        .args(&["unload", get_plist_path(task_label).to_str().unwrap_or_default()])
-        .output() {
+        .args(&[
+            "unload",
+            get_plist_path(task_label).to_str().unwrap_or_default(),
+        ])
+        .output()
+    {
         Ok(_) => Ok(()),
-        Err(_) => Err(Error::FailedToUnloadTask(format!("failed to unload {}", task_label)))
-    }
+        Err(_) => Err(Error::FailedToUnloadTask(format!(
+            "failed to unload {}",
+            task_label
+        ))),
+    };
 }
 
 pub fn delete_task(task_label: &str) -> Result<(), Error> {
     unload_task(task_label)?;
     delete_file_check(get_plist_path(task_label))?;
+    // move 'task' folder to trash
     move_by_rename(
         get_task_folder_name(task_label).as_path(),
         get_trash_folder_name(task_label).as_path(),
+    )?;
+    // move 'out' folder to trash
+    move_by_rename(
+        get_output_folder_name(task_label).as_path(),
+        get_trash_folder_name(task_label).join("out").as_path(),
     )?;
     Ok(())
 }

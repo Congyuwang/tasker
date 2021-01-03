@@ -31,15 +31,15 @@ pub async fn create_new_tasks(mut payload: Multipart) -> Result<HttpResponse, ac
         }
         let filepath = Path::new(TEMP_ZIP);
         save_single_zip(&mut field, filename).await?;
-        return match create_task(filepath) {
-            Ok(_) => Ok(HttpResponse::Ok().into()),
+        match create_task(filepath) {
+            Ok(_) => {}
             Err(e) => {
                 let response = HttpResponse::new(StatusCode::BAD_REQUEST);
-                Ok(response.set_body(Body::from(format!("fail to create task: {:?}", e))))
+                return Ok(response.set_body(Body::from(format!("fail to create task: {:?}", e))));
             }
         };
     }
-    Ok(HttpResponse::Ok().body("Successfully added task"))
+    Ok(HttpResponse::Ok().body("Successfully added all tasks"))
 }
 
 ///
@@ -92,7 +92,7 @@ pub async fn list_param(param: Query<Label>) -> impl Responder {
 pub async fn delete_param(param: Query<Label>) -> impl Responder {
     let delete_result = delete_task(&param.label);
     match delete_result {
-        Ok(_) => HttpResponse::Ok().body(""),
+        Ok(_) => HttpResponse::Ok().body("Successfully deleted task"),
         Err(e) => HttpResponse::InternalServerError().body(format!("{:?}", e)),
     }
 }
