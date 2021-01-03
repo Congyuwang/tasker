@@ -5,3 +5,5 @@
     - add 'upload' and 'load'.
 [0.1.2]
     - add '{root}' alias in program arguments.
+    - check load status for 'load' and 'unload'
+    - unload loaded task before covering with 'create'

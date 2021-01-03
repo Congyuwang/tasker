@@ -37,7 +37,7 @@ fn get_trash_folder_name(label_name: &str) -> PathBuf {
 
 pub fn load_task(task_label: &str) -> Result<String, Error> {
     if is_loaded(task_label)? {
-        return Err(Error::FailedToUnloadTask(
+        return Err(Error::FailedToLoadTask(
             "task is already loaded".to_string(),
         ));
     }
@@ -123,6 +123,11 @@ pub fn create_task(task_zip: &Path) -> Result<(), Error> {
     return if let Ok(yaml_content) = read_utf8_file(&yaml) {
         let mut config = Configuration::from_yaml(&yaml_content)?;
         let label = &config.label.clone();
+
+        if is_loaded(label)? {
+            unload_task(label)?;
+        }
+
         replace_task_root_alias(&mut config, label)?;
 
         // attempt to create task and output folder
