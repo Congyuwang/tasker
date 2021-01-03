@@ -7,7 +7,7 @@ use std::path::Path;
 use std::string::FromUtf8Error;
 use std::string::ToString;
 
-static LABEL_REG: &str = "^[A-Za-z_]+(\\.[A-Za-z_]+)*$";
+static LABEL_REG: &str = "^[A-Za-z0-9_]+(\\.[A-Za-z0-9_]+)*$";
 
 macro_rules! check_range_return_err {
     ($name: ident, $i: expr, $lo: expr, $hi: expr) => {
