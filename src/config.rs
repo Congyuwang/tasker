@@ -240,15 +240,15 @@ impl Config {
                 Ok(Config::RootDirectory(p))
             }
             Config::StandardInPath(p) => {
-                let p: String = Config::check_path(p)?;
+                let p: String = Config::check_file(p)?;
                 Ok(Config::StandardInPath(p))
             }
             Config::StandardOutPath(p) => {
-                let p: String = Config::check_path(p)?;
+                let p: String = Config::check_file(p)?;
                 Ok(Config::StandardOutPath(p))
             }
             Config::StandardErrorPath(p) => {
-                let p: String = Config::check_path(p)?;
+                let p: String = Config::check_file(p)?;
                 Ok(Config::StandardErrorPath(p))
             }
             _ => Ok(self),
@@ -259,6 +259,16 @@ impl Config {
         if !Path::new(&path).is_dir() {
             return Err(Error::ConfigPathError(format!(
                 "`{}` is not a directory",
+                path
+            )));
+        }
+        Ok(path)
+    }
+
+    fn check_file(path: String) -> Result<String, Error> {
+        if !Path::new(&path).is_file() {
+            return Err(Error::ConfigPathError(format!(
+                "`{}` is not a file",
                 path
             )));
         }
