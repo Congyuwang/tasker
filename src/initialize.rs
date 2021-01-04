@@ -14,6 +14,8 @@ pub struct Env {
     pub out_dir: PathBuf,
     pub pk_dir: Option<PathBuf>,
     pub crt_dir: Option<PathBuf>,
+    pub user_name: String,
+    pub password: String,
 }
 
 static mut ENVIRONMENT: Option<Env> = None;
@@ -45,6 +47,26 @@ impl Env {
         let crt_dir = match std::env::var("SSL_CERTIFICATE") {
             Ok(d) => Some(Path::new(&d).to_owned()),
             Err(_) => None,
+        };
+        let user_name = match std::env::var("USER_NAME") {
+            Ok(d) => {
+                if d.len() < 5 {
+                    panic!("USER_NAME must be at least 5 characters")
+                } else {
+                    d
+                }
+            }
+            Err(_) => panic!("USER_NAME missing in env"),
+        };
+        let password = match std::env::var("PASSWORD") {
+            Ok(d) => {
+                if d.len() < 12 {
+                    panic!("PASSWORD must be at least 12 characters")
+                } else {
+                    d
+                }
+            }
+            Err(_) => panic!("PASSWORD missing in env"),
         };
         let tasker_root = std::path::Path::new(&tasker_root).to_owned();
         let meta_dir = tasker_root.join(META_FOLDER);
@@ -78,6 +100,8 @@ impl Env {
             meta_file,
             pk_dir,
             crt_dir,
+            user_name,
+            password,
         }
     }
 

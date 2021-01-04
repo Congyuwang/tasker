@@ -20,11 +20,11 @@ pub fn index() -> HttpResponse {
     HttpResponse::Ok().body(INDEX_HTML)
 }
 
-pub fn list_all() -> HttpResponse{
+pub fn list_all() -> HttpResponse {
     HttpResponse::Ok().body(LIST_ALL_HTML)
 }
 
-pub fn list_part() -> HttpResponse{
+pub fn list_part() -> HttpResponse {
     HttpResponse::Ok().body(LIST_PART_HTML)
 }
 

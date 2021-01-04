@@ -9,9 +9,14 @@ async fn validator(
     req: ServiceRequest,
     _credentials: BasicAuth,
 ) -> Result<ServiceRequest, actix_web::Error> {
-    if _credentials.user_id().eq("influxdb")
+    if _credentials
+        .user_id()
+        .eq(&get_environment().unwrap().user_name)
         && _credentials.password().is_some()
-        && _credentials.password().unwrap().eq("influxdb_admin")
+        && _credentials
+            .password()
+            .unwrap()
+            .eq(&get_environment().unwrap().password)
     {
         Ok(req)
     } else {
@@ -32,16 +37,10 @@ async fn main() -> std::io::Result<()> {
             .service(
                 web::resource("/")
                     .route(web::get().to(server::index))
-                    .route(web::post().to(server::create_new_tasks))
+                    .route(web::post().to(server::create_new_tasks)),
             )
-            .service(
-                web::resource("/list_all")
-                    .route(web::get().to(server::list_all))
-            )
-            .service(
-                web::resource("/list")
-                    .route(web::get().to(server::list_part))
-            )
+            .service(web::resource("/list_all").route(web::get().to(server::list_all)))
+            .service(web::resource("/list").route(web::get().to(server::list_part)))
             .service(server::list_raw_json)
     });
 
@@ -58,8 +57,6 @@ async fn main() -> std::io::Result<()> {
             .run()
             .await
     } else {
-        app.bind(get_environment().unwrap().address())?
-            .run()
-            .await
+        app.bind(get_environment().unwrap().address())?.run().await
     }
 }

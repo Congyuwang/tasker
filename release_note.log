@@ -14,3 +14,4 @@
     - add confirmation for 'unload' and 'delete'
     - improve table view for '/list' and '/list_all'
     - add 'unload' and 'delete' for '/list' and '/list_all'
+    - customize username and password

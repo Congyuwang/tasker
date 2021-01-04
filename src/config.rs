@@ -267,10 +267,7 @@ impl Config {
 
     fn check_file(path: String) -> Result<String, Error> {
         if !Path::new(&path).is_file() {
-            return Err(Error::ConfigPathError(format!(
-                "`{}` is not a file",
-                path
-            )));
+            return Err(Error::ConfigPathError(format!("`{}` is not a file", path)));
         }
         Ok(path)
     }
