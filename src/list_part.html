@@ -27,16 +27,15 @@
             let se=confirm("Confirm your operation!");
             if (se) {
                 let xhr = new XMLHttpRequest();
-                xhr.open('GET', url, true);
+                xhr.open('GET', url);
                 xhr.responseType = "text"
-                xhr.onload = function() {
-                    let status = xhr.status;
-                    if (status === 200) {
-                        window.alert(xhr.response);
-                    } else {
-                        window.alert('failed to fetch: ' + xhr.status)
-                    }
-                };
+                xhr.send();
+                let status = xhr.status;
+                if (status === 200) {
+                    window.alert(xhr.response);
+                } else {
+                    window.alert('failed to fetch: ' + xhr.status)
+                }
                 window.location.reload()
             }
         }
@@ -95,7 +94,7 @@
                                 label.innerHTML = label_data;
                                 unload.innerHTML = "<input type=\"button\" onclick=\"verify('/unload?label="
                                     + label_data
-                                    + "')\" value=\"load\" />";
+                                    + "')\" value=\"unload\" />";
                                 del.innerHTML = "<input type=\"button\" onclick=\"verify('/delete?label="
                                     + label_data
                                     + "')\" value=\"delete\" />";

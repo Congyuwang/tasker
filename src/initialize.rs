@@ -48,15 +48,15 @@ impl Env {
             Ok(d) => Some(Path::new(&d).to_owned()),
             Err(_) => None,
         };
-        let user_name = match std::env::var("USER_NAME") {
+        let user_name = match std::env::var("USERNAME") {
             Ok(d) => {
                 if d.len() < 5 {
-                    panic!("USER_NAME must be at least 5 characters")
+                    panic!("USERNAME must be at least 5 characters")
                 } else {
                     d
                 }
             }
-            Err(_) => panic!("USER_NAME missing in env"),
+            Err(_) => panic!("USERNAME missing in env"),
         };
         let password = match std::env::var("PASSWORD") {
             Ok(d) => {
