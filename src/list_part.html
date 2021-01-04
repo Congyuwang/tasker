@@ -29,7 +29,13 @@
         button.home {
             background-color: #f383d1;
             justify-content: center;
-            text-align: center
+            text-align: center;
+        }
+        input.dangerous {
+            background-color: #e30000;
+            justify-content: center;
+            text-align: center;
+            font-weight: bold;
         }
     </style>
     <script type="text/javascript">
@@ -99,7 +105,7 @@
                                 unload.innerHTML = "<input type=\"button\" onclick=\"verify('/unload?label="
                                     + label_data
                                     + "')\" value=\"unload\" />";
-                                del.innerHTML = "<input type=\"button\" onclick=\"verify('/delete?label="
+                                del.innerHTML = "<input type=\"button\" class='input dangerous' onclick=\"verify('/delete?label="
                                     + label_data
                                     + "')\" value=\"delete\" />";
 
