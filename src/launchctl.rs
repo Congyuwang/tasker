@@ -6,14 +6,16 @@ use crate::utils::{
     create_dir_check, decompress, delete_file_check, execute_command, move_by_rename,
     read_utf8_file,
 };
-use crate::{PLIST_FOLDER, TASKER_TASK_NAME, TASK_ROOT_ALIAS, TEMP_UNZIP_FOLDER};
+use crate::{
+    PLIST_FOLDER, STD_ERR_FILE, STD_OUT_FILE, TASKER_TASK_NAME, TASK_ROOT_ALIAS, TEMP_UNZIP_FOLDER,
+};
+use regex::Regex;
 use serde::Serialize;
+use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use regex::Regex;
-use std::cmp::Ordering;
 
 #[derive(Debug, Serialize)]
 pub enum Status {
@@ -160,14 +162,14 @@ pub fn create_task(task_zip: &Path) -> Result<(), Error> {
         create_dir_check(&task_output_name)?;
 
         // create stdout and stderr files
-        if let Some(std_out_file) = task_output_name.join("stdout.log").to_str() {
+        if let Some(std_out_file) = task_output_name.join(STD_OUT_FILE).to_str() {
             config = config.add_config(Config::StandardOutPath(std_out_file.to_string()));
         } else {
             return Err(Error::NonUtfError(
                 "non-utf8 character not supported in stdout/stderr path".to_string(),
             ));
         }
-        if let Some(std_err_file) = task_output_name.join("stderr.log").to_str() {
+        if let Some(std_err_file) = task_output_name.join(STD_ERR_FILE).to_str() {
             config = config.add_config(Config::StandardErrorPath(std_err_file.to_string()));
         } else {
             return Err(Error::NonUtfError(
@@ -331,6 +333,22 @@ pub fn library_daemons_list(label_pattern: &str) -> Result<Vec<TaskInfo>, Error>
     }
 }
 
+pub fn view_std_err(label: &str) -> Result<String, Error> {
+    let std_err_file = get_output_folder_name(label).join(STD_ERR_FILE);
+    match read_utf8_file(std_err_file.as_path()) {
+        Ok(s) => Ok(s),
+        Err(e) => Err(Error::NonUtfError(format!("cannot find or read file: {:?}", e)))
+    }
+}
+
+pub fn view_std_out(label: &str) -> Result<String, Error> {
+    let std_out_file = get_output_folder_name(label).join(STD_OUT_FILE);
+    match read_utf8_file(std_out_file.as_path()) {
+        Ok(s) => Ok(s),
+        Err(e) => Err(Error::NonUtfError(format!("cannot find or read file: {:?}", e)))
+    }
+}
+
 impl PartialEq for TaskInfo {
     fn eq(&self, other: &Self) -> bool {
         self.label.eq(&other.label)
@@ -360,7 +378,7 @@ impl TaskInfo {
         };
         let last_exit_status = match split.next().unwrap_or("0").parse::<i32>() {
             Ok(d) => Some(d),
-            Err(_) => None
+            Err(_) => None,
         };
         let label = String::from(split.next().unwrap_or(""));
         let mut status = Status::NORMAL;
@@ -369,7 +387,12 @@ impl TaskInfo {
         } else if last_exit_status.unwrap() != 0 {
             status = Status::ERROR
         }
-        TaskInfo { pid, last_exit_status, label, status }
+        TaskInfo {
+            pid,
+            last_exit_status,
+            label,
+            status,
+        }
     }
 
     fn from_str_filter(output: &str, pattern: &str) -> BTreeSet<TaskInfo> {
@@ -389,6 +412,11 @@ impl TaskInfo {
     }
 
     fn from_just_label(label: &str) -> TaskInfo {
-        TaskInfo { pid: None, last_exit_status: None, label: label.to_string(), status: Status::UNLOADED}
+        TaskInfo {
+            pid: None,
+            last_exit_status: None,
+            label: label.to_string(),
+            status: Status::UNLOADED,
+        }
     }
 }

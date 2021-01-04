@@ -17,3 +17,6 @@
     - customize username and password
 [0.1.5]
     - include UNLOADED tasks in '/list' and '/list_all'
+[0.1.6]
+    - easily view 'stdout' and 'stderr'
+    - jump to 'list' view after successful creation

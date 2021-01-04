@@ -7,6 +7,8 @@ static TASKER_TASK_NAME: &str = "com.tasker.tasks";
 static PLIST_FOLDER: &str = "/Library/LaunchDaemons/";
 static TEMP_UNZIP_FOLDER: &str = "/tmp/tasker.task.com/temp_unzip/";
 static TASK_ROOT_ALIAS: &str = "~root~/";
+static STD_OUT_FILE: &str = "stdout.log";
+static STD_ERR_FILE: &str = "stderr.log";
 
 /// the config module provides api to convert task configuration to and from yaml and
 /// apple plist.

@@ -72,7 +72,7 @@
                         alert('Cannot get list: ' + err);
                     } else {
                         let fill_table = document.getElementById("table data"), row, label, pid, last_exit_status,
-                            status, load, unload, del;
+                            status, load, unload, del, stdout, stderr;
                         for (let d in json_data) {
 
                             row = document.createElement("tr");
@@ -83,6 +83,8 @@
                             load = document.createElement("td");
                             unload = document.createElement("td");
                             del = document.createElement("td");
+                            stdout = document.createElement("td");
+                            stderr = document.createElement("td");
 
                             if (json_data.hasOwnProperty(d)) {
 
@@ -115,12 +117,20 @@
                                 del.innerHTML = "<input type=\"button\" class='input dangerous' onclick=\"verify('/delete?label="
                                     + label_data
                                     + "')\" value=\"delete\" />";
+                                stdout.innerHTML = "<input type=\"button\" class='input' onclick=\"window.open('/stdout?label="
+                                    + label_data
+                                    + "')\" value=\"stdout\" />";
+                                stderr.innerHTML = "<input type=\"button\" class='input' onclick=\"window.open('/stderr?label="
+                                    + label_data
+                                    + "')\" value=\"stderr\" />";
 
                                 fill_table.appendChild(row);
                                 row.appendChild(label);
                                 row.appendChild(pid);
                                 row.appendChild(status);
                                 row.appendChild(last_exit_status);
+                                row.appendChild(stdout);
+                                row.appendChild(stderr);
                                 row.appendChild(load);
                                 row.appendChild(unload);
                                 row.appendChild(del);
@@ -142,7 +152,7 @@
 </form>
 <table class="table" id = "table data">
     <caption><b>Tasker List</b></caption>
-    <tr><th>Label</th><th>PID</th><th>Status</th><th>Last Exit Status</th><th colspan="3">Actions</th></tr>
+    <tr><th>Label</th><th>PID</th><th>Status</th><th>Last Exit Status</th><th colspan="5">Actions</th></tr>
 </table>
 </body>
 </html>

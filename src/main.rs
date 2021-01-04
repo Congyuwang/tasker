@@ -34,6 +34,8 @@ async fn main() -> std::io::Result<()> {
             .service(server::delete_param)
             .service(server::load_param)
             .service(server::unload_param)
+            .service(server::stderr_param)
+            .service(server::stdout_param)
             .service(
                 web::resource("/")
                     .route(web::get().to(server::index))

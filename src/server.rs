@@ -1,4 +1,4 @@
-use crate::launchctl::{create_task, delete_task, list, load_task, unload_task};
+use crate::launchctl::{create_task, delete_task, list, load_task, unload_task, view_std_err, view_std_out};
 use actix_multipart::{Field, Multipart};
 use actix_web::body::Body;
 use actix_web::http::StatusCode;
@@ -12,6 +12,7 @@ use std::path::Path;
 static INDEX_HTML: &'static str = include_str!("index.html");
 static LIST_ALL_HTML: &'static str = include_str!("list_all.html");
 static LIST_PART_HTML: &'static str = include_str!("list_part.html");
+static CREATE_SUCCESS: &'static str = include_str!("create_success.html");
 static MB_LIMIT: usize = 20;
 static SIZE_LIMIT: usize = MB_LIMIT * 1024 * 1024;
 static TEMP_ZIP: &str = "/tmp/tasker.task.temp.zip";
@@ -26,6 +27,10 @@ pub fn list_all() -> HttpResponse {
 
 pub fn list_part() -> HttpResponse {
     HttpResponse::Ok().body(LIST_PART_HTML)
+}
+
+pub fn create_success() -> HttpResponse {
+    HttpResponse::Ok().body(CREATE_SUCCESS)
 }
 
 ///
@@ -49,7 +54,7 @@ pub async fn create_new_tasks(mut payload: Multipart) -> Result<HttpResponse, ac
             }
         };
     }
-    Ok(HttpResponse::Ok().body("Successfully added all tasks"))
+    Ok(create_success())
 }
 
 ///
@@ -112,6 +117,24 @@ pub async fn unload_param(param: Query<Label>) -> impl Responder {
     let unload_task = unload_task(&param.label);
     match unload_task {
         Ok(_) => HttpResponse::Ok().body("Successfully unloaded task"),
+        Err(e) => HttpResponse::InternalServerError().body(format!("{:?}", e)),
+    }
+}
+
+#[get("/stdout")]
+pub async fn stdout_param(param: Query<Label>) -> impl Responder {
+    let unload_task = view_std_out(&param.label);
+    match unload_task {
+        Ok(s) => HttpResponse::Ok().body(s),
+        Err(e) => HttpResponse::InternalServerError().body(format!("{:?}", e)),
+    }
+}
+
+#[get("/stderr")]
+pub async fn stderr_param(param: Query<Label>) -> impl Responder {
+    let unload_task = view_std_err(&param.label);
+    match unload_task {
+        Ok(s) => HttpResponse::Ok().body(s),
         Err(e) => HttpResponse::InternalServerError().body(format!("{:?}", e)),
     }
 }

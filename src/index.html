@@ -21,13 +21,6 @@
             justify-content: center;
             text-align: center;
         }
-        h2 {
-            background-color: #e2fdb3;
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            text-align: center;
-        }
         .dangerous {
             background-color: #fd6d6d;
             display: flex;
@@ -88,6 +81,24 @@
             color: white;
         }
     </style>
+    <script>
+        function get_url_with_alert(url) {
+            if (confirm("Confirm your operation!")) {
+                let xhr = new XMLHttpRequest();
+                xhr.open('GET', url, true);
+                xhr.responseType = "text"
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        alert(xhr.response)
+                    } else {
+                        alert("failure: " + xhr.status)
+                    }
+                }
+                xhr.send();
+            }
+            return true;
+        }
+    </script>
 </head>
 <body>
 <h1 class="title">Tasker Task Manager</h1>
@@ -118,16 +129,34 @@
 </form>
 
 <h2>Load Tasks</h2>
-<form action="./load" method="get">
-    <label for="load_task">load task</label>
+<form method="get" onsubmit="get_url_with_alert('./load?label='+document.getElementById('load_task').value)">
+    <label for="load_task">
+        load task
+    </label>
     <br><br>
     <input id="load_task" type="search" name="label" required>
     <button type="submit">load</button>
 </form>
 
+<h2>View Stdout</h2>
+<form method="get" onsubmit="window.open('./stdout?label='+document.getElementById('stdout').value)">
+    <label for="stdout">view output log</label>
+    <br><br>
+    <input id="stdout" type="search" name="label" required>
+    <button type="submit">search</button>
+</form>
+
+<h2>View Stderr</h2>
+<form method="get" onsubmit="window.open('./stderr?label='+document.getElementById('stderr').value)">
+    <label for="stderr">view error log</label>
+    <br><br>
+    <input id="stderr" type="search" name="label" required>
+    <button type="submit">search</button>
+</form>
+
 <h2 class="h2 dangerous">Unload Tasks</h2>
-<form onsubmit="return confirm('Do you really want to unload?');"
-      action="./unload" method="get">
+<form onsubmit="get_url_with_alert('./unload?label='+document.getElementById('unload_task').value)"
+      method="get">
     <label for="unload_task">unload task</label>
     <br><br>
     <input id="unload_task" type="search" name="label" required>
@@ -135,8 +164,8 @@
 </form>
 
 <h2 class="h2 dangerous">Delete Tasks</h2>
-<form onsubmit="return confirm('Do you really want to delete?');"
-      action="./delete" method="get">
+<form onsubmit="get_url_with_alert('./delete?label='+document.getElementById('delete_task').value)"
+      method="get">
     <label for="delete_task">delete task</label>
     <br><br>
     <input id="delete_task" type="search" name="label" required>

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Task Creation Successful</title>
+    <style>
+        body {
+            background-color: #faf8ec;
+        }
+        h1 {
+            background-color: #e2fdb3;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+        }
+        h2 {
+            background-color: #e2fdb3;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+        }
+        label {
+            font-weight: bold;
+        }
+        form {
+            justify-content: center;
+            text-align: center;
+        }
+        p {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+        }
+        .button {
+            border: none;
+            color: white;
+            padding: 10px 28px;
+            text-align: center;
+            text-decoration: none;
+            display: inline-block;
+            font-size: 16px;
+            margin: 4px 2px;
+            transition-duration: 0.4s;
+            cursor: pointer;
+        }
+        .button2 {
+            background-color: white;
+            color: black;
+            border: 2px solid #008CBA;
+        }
+        .button2:hover {
+            background-color: #008CBA;
+            color: white;
+        }
+    </style>
+    <meta http-equiv="refresh" content="2; URL='/list_all'" />
+</head>
+<body>
+<h1 class="title">Task Creation Successful</h1>
+
+<p>
+    <b>About to jump to list page in 2 seconds</b>
+</p>
+
+<h2>List All Tasks</h2>
+<form onclick="location.href = '/list_all'">
+    <button class="button button2" type="button">List all</button>
+</form>
+
+</body>
+</html>
