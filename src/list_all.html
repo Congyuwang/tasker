@@ -21,21 +21,25 @@
             font-weight: bold;
             height: 60px;
         }
+        form {
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+        }
+        button.home {
+            background-color: #f383d1;
+            justify-content: center;
+            text-align: center
+        }
     </style>
     <script type="text/javascript">
         function verify(url) {
             let se=confirm("Confirm your operation!");
             if (se) {
                 let xhr = new XMLHttpRequest();
-                xhr.open('GET', url);
+                xhr.open('GET', url, true);
                 xhr.responseType = "text"
                 xhr.send();
-                let status = xhr.status;
-                if (status === 200) {
-                    window.alert(xhr.response);
-                } else {
-                    window.alert('failed to fetch: ' + xhr.status)
-                }
                 window.location.reload()
             }
         }
@@ -113,6 +117,11 @@
 </head>
 <body>
 <h1>List Tasks</h1>
+<form onclick="location.href = '/'">
+    <button class="button home" type="button">
+        Return to Home Page
+    </button>
+</form>
 <table class="table" id = "table data">
     <caption><b>Tasker List</b></caption>
     <tr><th>Label</th><th>PID</th><th>Status</th><th colspan="2">Actions</th></tr>
