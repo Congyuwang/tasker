@@ -20,4 +20,5 @@ pub enum Error {
     FailedToReplaceRootAlias(String),
     CommandExecutionError(String),
     FailedToReadPlistFolder(String),
+    FailedToClearTempFolder(String),
 }

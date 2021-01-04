@@ -1,4 +1,6 @@
-use crate::launchctl::{create_task, delete_task, list, load_task, unload_task, view_std_err, view_std_out};
+use crate::launchctl::{
+    create_task, delete_task, list, load_task, unload_task, view_std_err, view_std_out,
+};
 use actix_multipart::{Field, Multipart};
 use actix_web::body::Body;
 use actix_web::http::StatusCode;

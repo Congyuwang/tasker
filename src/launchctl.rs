@@ -142,6 +142,14 @@ pub fn replace_task_root_alias(config: &mut Configuration, task_label: &str) -> 
 
 pub fn create_task(task_zip: &Path) -> Result<(), Error> {
     let unzip_folder = Path::new(TEMP_UNZIP_FOLDER);
+    match std::fs::remove_dir_all(unzip_folder) {
+        Ok(_) => {}
+        Err(_) => {
+            return Err(Error::FailedToClearTempFolder(
+                "cannot clear folder: ".to_string() + TEMP_UNZIP_FOLDER,
+            ))
+        }
+    };
     decompress(&task_zip, Path::new(TEMP_UNZIP_FOLDER))?;
     let yaml = get_yaml(&unzip_folder)?;
 
@@ -337,7 +345,10 @@ pub fn view_std_err(label: &str) -> Result<String, Error> {
     let std_err_file = get_output_folder_name(label).join(STD_ERR_FILE);
     match read_utf8_file(std_err_file.as_path()) {
         Ok(s) => Ok(s),
-        Err(e) => Err(Error::NonUtfError(format!("cannot find or read file: {:?}", e)))
+        Err(e) => Err(Error::NonUtfError(format!(
+            "cannot find or read file: {:?}",
+            e
+        ))),
     }
 }
 
@@ -345,7 +356,10 @@ pub fn view_std_out(label: &str) -> Result<String, Error> {
     let std_out_file = get_output_folder_name(label).join(STD_OUT_FILE);
     match read_utf8_file(std_out_file.as_path()) {
         Ok(s) => Ok(s),
-        Err(e) => Err(Error::NonUtfError(format!("cannot find or read file: {:?}", e)))
+        Err(e) => Err(Error::NonUtfError(format!(
+            "cannot find or read file: {:?}",
+            e
+        ))),
     }
 }
 
