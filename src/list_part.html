@@ -43,8 +43,7 @@
             let se=confirm("Confirm your operation!");
             if (se) {
                 let xhr = new XMLHttpRequest();
-                xhr.open('GET', url, false);
-                xhr.responseType = "text"
+                xhr.open('GET', url, true);
                 xhr.send();
                 window.location.reload()
             }
@@ -72,13 +71,16 @@
                     if (err !== null) {
                         alert('Cannot get list: ' + err);
                     } else {
-                        let fill_table = document.getElementById("table data"), row, label, pid, status, unload, del;
+                        let fill_table = document.getElementById("table data"), row, label, pid, last_exit_status,
+                            status, load, unload, del;
                         for (let d in json_data) {
 
                             row = document.createElement("tr");
                             label = document.createElement("td");
                             pid = document.createElement("td");
                             status = document.createElement("td");
+                            last_exit_status = document.createElement("td");
+                            load = document.createElement("td");
                             unload = document.createElement("td");
                             del = document.createElement("td");
 
@@ -86,6 +88,7 @@
 
                                 let label_data = json_data[d]['label']
                                 let pid_data = json_data[d]['pid']
+                                let last_exit_status_data = json_data[d]['last_exit_status']
                                 let status_data = json_data[d]['status']
 
                                 row.style = CSSStyleDeclaration.prototype;
@@ -93,15 +96,19 @@
                                 row.style.justifyContent = "center"
                                 row.style.border = "1px solid #999"
 
-                                if (status_data === 0) {
-                                    row.style.backgroundColor = "#42d742";
-                                } else {
+                                if (status_data === "ERROR") {
                                     row.style.backgroundColor = "#ff5e5e";
+                                } else {
+                                    row.style.backgroundColor = "#42d742";
                                 }
 
                                 pid.innerHTML = pid_data;
                                 status.innerHTML = status_data;
+                                last_exit_status.innerHTML = last_exit_status_data;
                                 label.innerHTML = label_data;
+                                load.innerHTML = "<input type=\"button\" onclick=\"verify('/load?label="
+                                    + label_data
+                                    + "')\" value=\"load\" />";
                                 unload.innerHTML = "<input type=\"button\" onclick=\"verify('/unload?label="
                                     + label_data
                                     + "')\" value=\"unload\" />";
@@ -113,6 +120,8 @@
                                 row.appendChild(label);
                                 row.appendChild(pid);
                                 row.appendChild(status);
+                                row.appendChild(last_exit_status);
+                                row.appendChild(load);
                                 row.appendChild(unload);
                                 row.appendChild(del);
                             }
@@ -133,7 +142,7 @@
 </form>
 <table class="table" id = "table data">
     <caption><b>Tasker List</b></caption>
-    <tr><th>Label</th><th>PID</th><th>Status</th><th colspan="2">Actions</th></tr>
+    <tr><th>Label</th><th>PID</th><th>Status</th><th>Last Exit Status</th><th colspan="3">Actions</th></tr>
 </table>
 </body>
 </html>

@@ -15,3 +15,5 @@
     - improve table view for '/list' and '/list_all'
     - add 'unload' and 'delete' for '/list' and '/list_all'
     - customize username and password
+[0.1.5]
+    - include UNLOADED tasks in '/list' and '/list_all'

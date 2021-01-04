@@ -8,15 +8,27 @@ use crate::utils::{
 };
 use crate::{PLIST_FOLDER, TASKER_TASK_NAME, TASK_ROOT_ALIAS, TEMP_UNZIP_FOLDER};
 use serde::Serialize;
+use std::collections::BTreeSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use regex::Regex;
+use std::cmp::Ordering;
+
+#[derive(Debug, Serialize)]
+pub enum Status {
+    RUNNING,
+    UNLOADED,
+    NORMAL,
+    ERROR,
+}
 
 #[derive(Debug, Serialize)]
 pub struct TaskInfo {
     pid: Option<i32>,
-    status: i32,
+    last_exit_status: Option<i32>,
     label: String,
+    status: Status,
 }
 
 fn get_plist_path(label_name: &str) -> PathBuf {
@@ -224,7 +236,39 @@ pub fn get_yaml(unzipped_folder: &Path) -> Result<PathBuf, Error> {
     };
 }
 
-pub fn list_inner(label_pattern: &str) -> Result<Vec<TaskInfo>, Error> {
+pub fn is_loaded(label_pattern: &str) -> Result<bool, Error> {
+    let task_list = launchctl_list(label_pattern)?;
+    for t in task_list {
+        if t.label.eq(label_pattern) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+pub fn list(label_pattern: &str) -> Result<String, Error> {
+    let mut launchctl_info = launchctl_list(label_pattern)?;
+    let library_daemons_info = library_daemons_list(label_pattern)?;
+    for task in library_daemons_info {
+        if !launchctl_info.contains(&task) {
+            launchctl_info.insert(task);
+        }
+    }
+    let mut task_info = Vec::new();
+    for task in launchctl_info {
+        task_info.push(task);
+    }
+    match serde_json::to_string_pretty(&task_info) {
+        Ok(s) => Ok(s),
+        Err(_) => {
+            return Err(Error::LaunchctlListError(
+                "list error: serialize error".parse().unwrap(),
+            ))
+        }
+    }
+}
+
+pub fn launchctl_list(label_pattern: &str) -> Result<BTreeSet<TaskInfo>, Error> {
     match execute_command(Command::new("launchctl").arg("list")) {
         Ok(list_output) => {
             let task_info = TaskInfo::from_str_filter(&list_output, label_pattern);
@@ -239,25 +283,71 @@ pub fn list_inner(label_pattern: &str) -> Result<Vec<TaskInfo>, Error> {
     }
 }
 
-pub fn is_loaded(label_pattern: &str) -> Result<bool, Error> {
-    let task_list = list_inner(label_pattern)?;
-    for t in task_list {
-        if t.label.eq(label_pattern) {
-            return Ok(true);
-        }
+pub fn library_daemons_list(label_pattern: &str) -> Result<Vec<TaskInfo>, Error> {
+    lazy_static! {
+        static ref LABEL_REGEX: Regex = Regex::new("^(.+)\\.plist$").unwrap();
     }
-    Ok(false)
+    if let Ok(dir) = Path::new(PLIST_FOLDER).read_dir() {
+        let mut tasks: Vec<TaskInfo> = Vec::new();
+        for file in dir {
+            if let Ok(f) = file {
+                let path = f.path();
+                if let Some(file_name) = f.file_name().to_str() {
+                    if path.is_file()
+                        && path.extension().unwrap_or_default().eq("plist")
+                        && file_name.contains(label_pattern)
+                        && file_name.contains(TASKER_TASK_NAME)
+                    {
+                        if let Some(cap) = LABEL_REGEX.captures(file_name) {
+                            if cap.len() == 2 {
+                                tasks.push(TaskInfo::from_just_label(&cap[1]));
+                            } else {
+                                return Err(Error::FailedToReadPlistFolder(String::from(
+                                    "fail to find label in plist file name",
+                                )));
+                            }
+                        } else {
+                            return Err(Error::FailedToReadPlistFolder(String::from(
+                                "fail to capture label in plist file name",
+                            )));
+                        }
+                    }
+                } else {
+                    return Err(Error::FailedToReadPlistFolder(String::from(
+                        "unsupported character in file name",
+                    )));
+                }
+            } else {
+                return Err(Error::FailedToReadPlistFolder(
+                    String::from("cannot get file info in: ") + &PLIST_FOLDER,
+                ));
+            }
+        }
+        Ok(tasks)
+    } else {
+        Err(Error::FailedToReadPlistFolder(
+            String::from("cannot list file in: ") + &PLIST_FOLDER,
+        ))
+    }
 }
 
-pub fn list(label_pattern: &str) -> Result<String, Error> {
-    let task_info = list_inner(label_pattern)?;
-    match serde_json::to_string_pretty(&task_info) {
-        Ok(s) => Ok(s),
-        Err(_) => {
-            return Err(Error::LaunchctlListError(
-                "list error: serialize error".parse().unwrap(),
-            ))
-        }
+impl PartialEq for TaskInfo {
+    fn eq(&self, other: &Self) -> bool {
+        self.label.eq(&other.label)
+    }
+}
+
+impl Eq for TaskInfo {}
+
+impl PartialOrd for TaskInfo {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.label.partial_cmp(&other.label)
+    }
+}
+
+impl Ord for TaskInfo {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.label.cmp(&other.label)
     }
 }
 
@@ -268,43 +358,37 @@ impl TaskInfo {
             Ok(i) => Some(i),
             Err(_) => None,
         };
-        let status: i32 = split.next().unwrap_or("0").parse::<i32>().unwrap_or(0);
+        let last_exit_status = match split.next().unwrap_or("0").parse::<i32>() {
+            Ok(d) => Some(d),
+            Err(_) => None
+        };
         let label = String::from(split.next().unwrap_or(""));
-        TaskInfo { pid, status, label }
+        let mut status = Status::NORMAL;
+        if pid.is_some() {
+            status = Status::RUNNING
+        } else if last_exit_status.unwrap() != 0 {
+            status = Status::ERROR
+        }
+        TaskInfo { pid, last_exit_status, label, status }
     }
 
-    fn from_str_filter(output: &str, pattern: &str) -> Vec<TaskInfo> {
+    fn from_str_filter(output: &str, pattern: &str) -> BTreeSet<TaskInfo> {
         let mut lines = output.lines();
         let mut temp = Vec::new();
-        let mut returned = Vec::new();
+        let mut collected = BTreeSet::new();
         lines.next();
         for line in lines {
             temp.push(TaskInfo::from_line(line))
         }
         for task in temp {
             if task.label.contains(pattern) && task.label.contains(TASKER_TASK_NAME) {
-                returned.push(task);
+                collected.insert(task);
             }
         }
-        returned
+        collected
     }
-}
 
-#[cfg(test)]
-mod test_launchctl {
-    use super::*;
-
-    #[test]
-    fn test_list() {
-        let result = list("com.apple.mdworker.mail").unwrap();
-        let expected = String::new()
-            + "[\n"
-            + "  {\n"
-            + "    \"pid\": null,\n"
-            + "    \"status\": 0,\n"
-            + "    \"label\": \"com.apple.mdworker.mail\"\n"
-            + "  }\n"
-            + "]";
-        assert_eq!(result, expected);
+    fn from_just_label(label: &str) -> TaskInfo {
+        TaskInfo { pid: None, last_exit_status: None, label: label.to_string(), status: Status::UNLOADED}
     }
 }

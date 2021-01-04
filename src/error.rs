@@ -19,4 +19,5 @@ pub enum Error {
     FailedToUnloadTask(String),
     FailedToReplaceRootAlias(String),
     CommandExecutionError(String),
+    FailedToReadPlistFolder(String),
 }
