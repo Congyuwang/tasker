@@ -2,7 +2,7 @@
     - upload and create tasks, delete tasks.
 [0.1.1]
     - delete 'out' folder when deleting tasks.
-    - add 'unload' and 'load'.
+    - add '/unload' and '/load'.
 [0.1.2]
     - add '{root}' alias in program arguments.
     - check load status for 'load' and 'unload'
@@ -10,3 +10,7 @@
 [0.1.3]
     - add SSL support
     - add login support
+[0.1.4]
+    - add confirmation for 'unload' and 'delete'
+    - improve table view for '/list' and '/list_all'
+    - add 'unload' and 'delete' for '/list' and '/list_all'

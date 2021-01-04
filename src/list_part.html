@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>All Tasks</title>
+    <style>
+        h1 {
+            background-color: #e2fdb3;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+        }
+        table{
+            border-collapse: collapse;
+            justify-content: center;
+            text-align: center;
+            width: 100%
+        }
+        caption {
+            font-weight: bold;
+            height: 60px;
+        }
+    </style>
+    <script type="text/javascript">
+        function verify(url) {
+            let se=confirm("Confirm your operation!");
+            if (se) {
+                let xhr = new XMLHttpRequest();
+                xhr.open('GET', url, true);
+                xhr.responseType = "text"
+                xhr.onload = function() {
+                    let status = xhr.status;
+                    if (status === 200) {
+                        window.alert(xhr.response);
+                    } else {
+                        window.alert('failed to fetch: ' + xhr.status)
+                    }
+                };
+                window.location.reload()
+            }
+        }
+        function getJSON(url, callback) {
+            let xhr = new XMLHttpRequest();
+            xhr.open('GET', url, true);
+            xhr.responseType = 'json';
+            xhr.onload = function() {
+                let status = xhr.status;
+                if (status === 200) {
+                    callback(null, xhr.response);
+                } else {
+                    callback(status, xhr.response);
+                }
+            };
+            xhr.send();
+        }
+        function load_table() {
+            let url_string = window.location.href
+            let url = new URL(url_string);
+            let label = url.searchParams.get("label");
+            getJSON('/list_raw_json?label=' + label,
+                function(err, json_data) {
+                    if (err !== null) {
+                        alert('Cannot get list: ' + err);
+                    } else {
+                        let fill_table = document.getElementById("table data"), row, label, pid, status, unload, del;
+                        for (let d in json_data) {
+
+                            row = document.createElement("tr");
+                            label = document.createElement("td");
+                            pid = document.createElement("td");
+                            status = document.createElement("td");
+                            unload = document.createElement("td");
+                            del = document.createElement("td");
+
+                            if (json_data.hasOwnProperty(d)) {
+
+                                let label_data = json_data[d]['label']
+                                let pid_data = json_data[d]['pid']
+                                let status_data = json_data[d]['status']
+
+                                row.style = CSSStyleDeclaration.prototype;
+                                row.style.textAlign = "center"
+                                row.style.justifyContent = "center"
+                                row.style.border = "1px solid #999"
+
+                                if (status_data === 0) {
+                                    row.style.backgroundColor = "#42d742";
+                                } else {
+                                    row.style.backgroundColor = "#ff5e5e";
+                                }
+
+                                pid.innerHTML = pid_data;
+                                status.innerHTML = status_data;
+                                label.innerHTML = label_data;
+                                unload.innerHTML = "<input type=\"button\" onclick=\"verify('/unload?label="
+                                    + label_data
+                                    + "')\" value=\"load\" />";
+                                del.innerHTML = "<input type=\"button\" onclick=\"verify('/delete?label="
+                                    + label_data
+                                    + "')\" value=\"delete\" />";
+
+                                fill_table.appendChild(row);
+                                row.appendChild(label);
+                                row.appendChild(pid);
+                                row.appendChild(status);
+                                row.appendChild(unload);
+                                row.appendChild(del);
+                            }
+                        }
+                    }
+                }
+            );
+        }
+        addEventListener("load", load_table);
+    </script>
+</head>
+<body>
+<h1>List Tasks</h1>
+<table class="table" id = "table data">
+    <caption><b>Tasker List</b></caption>
+    <tr><th>Label</th><th>PID</th><th>Status</th><th colspan="2">Actions</th></tr>
+</table>
+</body>
+</html>

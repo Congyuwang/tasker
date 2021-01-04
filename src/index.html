@@ -4,6 +4,50 @@
     <meta charset="UTF-8">
     <title>Tasker</title>
     <style>
+        body {
+            background-color: #faf8ec;
+        }
+        h1 {
+            background-color: #e2fdb3;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+        }
+        h2 {
+            background-color: #e2fdb3;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+        }
+        h2 {
+            background-color: #e2fdb3;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+        }
+        .dangerous {
+            background-color: #fd6d6d;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+        }
+        label {
+            font-weight: bold;
+        }
+        form {
+            justify-content: center;
+            text-align: center;
+        }
+        p {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+        }
         .button {
             border: none;
             color: white;
@@ -46,11 +90,11 @@
     </style>
 </head>
 <body>
-<h1>Task Management System</h1>
+<h1 class="title">Tasker Task Manager</h1>
 
-<h2>Add New Task</h2>
+<h2 class="subtitle" style="background-color:rgba(0,255,0,0.25)">Add New Task</h2>
 <p>
-    Choose the zip file to upload:
+    <b>Choose the zip file to upload:</b>
 </p>
 <form target="/" method="post" enctype="multipart/form-data">
     <input type="file" multiple name="file" id="upload" accept=".zip"/>
@@ -75,22 +119,24 @@
 
 <h2>Load Tasks</h2>
 <form action="./load" method="get">
-    <label for="load_task">delete task</label>
+    <label for="load_task">load task</label>
     <br><br>
     <input id="load_task" type="search" name="label" required>
     <button type="submit">load</button>
 </form>
 
-<h2>Unload Tasks</h2>
-<form action="./unload" method="get">
-    <label for="unload_task">delete task</label>
+<h2 class="h2 dangerous">Unload Tasks</h2>
+<form onsubmit="return confirm('Do you really want to unload?');"
+      action="./unload" method="get">
+    <label for="unload_task">unload task</label>
     <br><br>
     <input id="unload_task" type="search" name="label" required>
     <button type="submit">UNLOAD</button>
 </form>
 
-<h2>Delete Tasks</h2>
-<form action="./delete" method="get">
+<h2 class="h2 dangerous">Delete Tasks</h2>
+<form onsubmit="return confirm('Do you really want to delete?');"
+      action="./delete" method="get">
     <label for="delete_task">delete task</label>
     <br><br>
     <input id="delete_task" type="search" name="label" required>

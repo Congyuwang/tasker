@@ -26,16 +26,23 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(middleware::Logger::default())
             .wrap(auth)
-            .service(server::list_all)
-            .service(server::list_param)
             .service(server::delete_param)
             .service(server::load_param)
             .service(server::unload_param)
             .service(
                 web::resource("/")
                     .route(web::get().to(server::index))
-                    .route(web::post().to(server::create_new_tasks)),
+                    .route(web::post().to(server::create_new_tasks))
             )
+            .service(
+                web::resource("/list_all")
+                    .route(web::get().to(server::list_all))
+            )
+            .service(
+                web::resource("/list")
+                    .route(web::get().to(server::list_part))
+            )
+            .service(server::list_raw_json)
     });
 
     let env = get_environment().unwrap();
@@ -48,12 +55,10 @@ async fn main() -> std::io::Result<()> {
             .set_certificate_chain_file(crt)
             .expect("ssl crt file error");
         app.bind_openssl(get_environment().unwrap().address(), builder)?
-            .workers(2)
             .run()
             .await
     } else {
         app.bind(get_environment().unwrap().address())?
-            .workers(2)
             .run()
             .await
     }

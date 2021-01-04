@@ -10,12 +10,22 @@ use std::io::Write;
 use std::path::Path;
 
 static INDEX_HTML: &'static str = include_str!("index.html");
+static LIST_ALL_HTML: &'static str = include_str!("list_all.html");
+static LIST_PART_HTML: &'static str = include_str!("list_part.html");
 static MB_LIMIT: usize = 20;
 static SIZE_LIMIT: usize = MB_LIMIT * 1024 * 1024;
 static TEMP_ZIP: &str = "/tmp/tasker.task.temp.zip";
 
 pub fn index() -> HttpResponse {
     HttpResponse::Ok().body(INDEX_HTML)
+}
+
+pub fn list_all() -> HttpResponse{
+    HttpResponse::Ok().body(LIST_ALL_HTML)
+}
+
+pub fn list_part() -> HttpResponse{
+    HttpResponse::Ok().body(LIST_PART_HTML)
 }
 
 ///
@@ -70,17 +80,8 @@ pub struct Label {
     label: String,
 }
 
-#[get("/list_all")]
-pub async fn list_all() -> impl Responder {
-    let all_list = list("");
-    match all_list {
-        Ok(s) => HttpResponse::Ok().body(s),
-        Err(e) => HttpResponse::InternalServerError().body(format!("{:?}", e)),
-    }
-}
-
-#[get("/list")]
-pub async fn list_param(param: Query<Label>) -> impl Responder {
+#[get("/list_raw_json")]
+pub async fn list_raw_json(param: Query<Label>) -> impl Responder {
     let list_result = list(&param.label);
     match list_result {
         Ok(s) => HttpResponse::Ok().body(s),
