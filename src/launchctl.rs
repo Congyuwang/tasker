@@ -59,6 +59,9 @@ pub fn load_task(task_label: &str) -> Result<String, Error> {
             "task is already loaded".to_string(),
         ));
     }
+    if !exist(task_label)? {
+        return Err(Error::TaskDoesNotExist("no such task to load".to_string()));
+    }
     execute_command(Command::new("launchctl").args(&[
         "load",
         get_plist_path(task_label).to_str().unwrap_or_default(),
@@ -71,7 +74,7 @@ pub fn load_task(task_label: &str) -> Result<String, Error> {
 pub fn unload_task(task_label: &str) -> Result<String, Error> {
     if !is_loaded(task_label)? {
         return Err(Error::FailedToUnloadTask(
-            "task is already unloaded".to_string(),
+            "task is already unloaded or does not exist".to_string(),
         ));
     }
     execute_command(Command::new("launchctl").args(&[
@@ -258,7 +261,6 @@ fn replace_task_root_alias(config: &mut Configuration, task_label: &str) -> Resu
 /// - add or override stdout stderr path
 ///
 fn process_config(mut config: Configuration) -> Result<Configuration, Error> {
-
     let label = &config.label.clone();
 
     // replace root alias
@@ -353,7 +355,7 @@ fn place_plist_and_load(config: &Configuration, label: &String) -> Result<(), Er
     }
 }
 
-pub fn is_loaded(label_pattern: &str) -> Result<bool, Error> {
+fn is_loaded(label_pattern: &str) -> Result<bool, Error> {
     let task_list = launchctl_list(label_pattern)?;
     for t in task_list {
         if t.label.eq(label_pattern) {
@@ -363,7 +365,7 @@ pub fn is_loaded(label_pattern: &str) -> Result<bool, Error> {
     Ok(false)
 }
 
-pub fn exist(label_pattern: &str) -> Result<bool, Error> {
+fn exist(label_pattern: &str) -> Result<bool, Error> {
     let task_list = list_combined(label_pattern)?;
     for t in task_list {
         if t.label.eq(label_pattern) {
@@ -392,7 +394,7 @@ pub fn list(label_pattern: &str) -> Result<String, Error> {
 ///
 /// This function combines the result of `launchctl_list` and `library_daemons_list`
 ///
-pub fn list_combined(label_pattern: &str) -> Result<Vec<TaskInfo>, Error> {
+fn list_combined(label_pattern: &str) -> Result<Vec<TaskInfo>, Error> {
     let mut launchctl_info = launchctl_list(label_pattern)?;
     let library_daemons_info = library_daemons_list(label_pattern)?;
     for task in library_daemons_info {
@@ -411,7 +413,7 @@ pub fn list_combined(label_pattern: &str) -> Result<Vec<TaskInfo>, Error> {
 /// This function obtains a list of tasks from the launchctl command and
 /// convert it into a Set of `TaskInfo`.
 ///
-pub fn launchctl_list(label_pattern: &str) -> Result<BTreeSet<TaskInfo>, Error> {
+fn launchctl_list(label_pattern: &str) -> Result<BTreeSet<TaskInfo>, Error> {
     match execute_command(Command::new("launchctl").arg("list")) {
         Ok(list_output) => {
             let task_info = TaskInfo::from_str_filter(&list_output, label_pattern);
@@ -430,7 +432,7 @@ pub fn launchctl_list(label_pattern: &str) -> Result<BTreeSet<TaskInfo>, Error> 
 /// This function obtains a list of tasks from `/Library/LaunchDaemons` folder and
 /// convert it into a vector of `TaskInfo`
 ///
-pub fn library_daemons_list(label_pattern: &str) -> Result<Vec<TaskInfo>, Error> {
+fn library_daemons_list(label_pattern: &str) -> Result<Vec<TaskInfo>, Error> {
     lazy_static! {
         static ref LABEL_REGEX: Regex = Regex::new("^(.+)\\.plist$").unwrap();
     }
@@ -479,6 +481,11 @@ pub fn library_daemons_list(label_pattern: &str) -> Result<Vec<TaskInfo>, Error>
 }
 
 pub fn view_yaml(label: &str) -> Result<String, Error> {
+    if !exist(label)? {
+        return Err(Error::TaskDoesNotExist(
+            "attempting to view yaml of non-existent tasks".to_string(),
+        ));
+    }
     let yaml_file = get_environment()
         .unwrap()
         .meta_dir
@@ -497,8 +504,8 @@ pub fn view_std_err(label: &str) -> Result<String, Error> {
     match read_utf8_file(std_err_file.as_path()) {
         Ok(s) => Ok(s),
         Err(e) => Err(Error::NonUtfError(format!(
-            "cannot find or read file: {:?}",
-            e
+            "task `{}` has not been created or its stderr has not been created: {:?}",
+            label, e
         ))),
     }
 }
@@ -508,8 +515,8 @@ pub fn view_std_out(label: &str) -> Result<String, Error> {
     match read_utf8_file(std_out_file.as_path()) {
         Ok(s) => Ok(s),
         Err(e) => Err(Error::NonUtfError(format!(
-            "cannot find or read file: {:?}",
-            e
+            "task `{}` has not been created or its stdout has not been created: {:?}",
+            label, e
         ))),
     }
 }

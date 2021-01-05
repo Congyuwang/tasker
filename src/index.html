@@ -89,9 +89,9 @@
                 xhr.responseType = "text"
                 xhr.onload = function() {
                     if (xhr.status === 200) {
-                        alert(xhr.response)
+                        alert(xhr.responseText)
                     } else {
-                        alert("failure: " + xhr.status)
+                        alert("failure: " + xhr.status + " (" + xhr.responseText + ")")
                     }
                 }
                 xhr.send();
