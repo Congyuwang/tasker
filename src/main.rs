@@ -44,8 +44,8 @@ async fn main() -> std::io::Result<()> {
                     .route(web::post().to(server::create_new_tasks)),
             )
             .service(web::resource("/list_all").route(web::get().to(server::list_all)))
-            .service(web::resource("/list").route(web::get().to(server::list_part)))
-            .service(web::resource("/yaml").route(web::get().to(server::edit_yaml)))
+            .service(web::resource("/list_part.html").route(web::get().to(server::list_part)))
+            .service(web::resource("/edit_yaml.html").route(web::get().to(server::edit_yaml)))
             .service(server::list_raw_json)
     });
 

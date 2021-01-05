@@ -96,7 +96,6 @@
                 }
                 xhr.send();
             }
-            return true;
         }
     </script>
 </head>
@@ -121,7 +120,7 @@
 </form>
 
 <h2>Search Tasks</h2>
-<form action="./list" method="get">
+<form action="./list_part.html" method="get">
     <label for="search_task">search for tasks using partial label name</label>
     <br><br>
     <input id="search_task" type="search" name="label" required>
@@ -129,7 +128,7 @@
 </form>
 
 <h2>Load Tasks</h2>
-<form method="get" onsubmit="get_url_with_alert('./load?label='+document.getElementById('load_task').value)">
+<form onsubmit="get_url_with_alert('./load?label='+document.getElementById('load_task').value); return false;">
     <label for="load_task">
         load task
     </label>
@@ -139,7 +138,7 @@
 </form>
 
 <h2>View YAML</h2>
-<form method="get" onsubmit="window.open('./yaml?label='+document.getElementById('yaml').value)">
+<form onsubmit="window.open('./edit_yaml.html?label='+document.getElementById('yaml').value); return false;">
     <label for="yaml">view output log</label>
     <br><br>
     <input id="yaml" type="search" name="label" required>
@@ -147,7 +146,7 @@
 </form>
 
 <h2>View Stdout</h2>
-<form method="get" onsubmit="window.open('./stdout?label='+document.getElementById('stdout').value)">
+<form onsubmit="window.open('./stdout?label='+document.getElementById('stdout').value); return false;">
     <label for="stdout">view output log</label>
     <br><br>
     <input id="stdout" type="search" name="label" required>
@@ -155,7 +154,7 @@
 </form>
 
 <h2>View Stderr</h2>
-<form method="get" onsubmit="window.open('./stderr?label='+document.getElementById('stderr').value)">
+<form onsubmit="window.open('./stderr?label='+document.getElementById('stderr').value); return false;">
     <label for="stderr">view error log</label>
     <br><br>
     <input id="stderr" type="search" name="label" required>
@@ -163,8 +162,7 @@
 </form>
 
 <h2 class="h2 dangerous">Unload Tasks</h2>
-<form onsubmit="get_url_with_alert('./unload?label='+document.getElementById('unload_task').value)"
-      method="get">
+<form onsubmit="get_url_with_alert('./unload?label='+document.getElementById('unload_task').value); return false;">
     <label for="unload_task">unload task</label>
     <br><br>
     <input id="unload_task" type="search" name="label" required>
@@ -172,8 +170,7 @@
 </form>
 
 <h2 class="h2 dangerous">Delete Tasks</h2>
-<form onsubmit="get_url_with_alert('./delete?label='+document.getElementById('delete_task').value)"
-      method="get">
+<form onsubmit="get_url_with_alert('./delete?label='+document.getElementById('delete_task').value); return false;">
     <label for="delete_task">delete task</label>
     <br><br>
     <input id="delete_task" type="search" name="label" required>

@@ -50,8 +50,6 @@
                 }
                 xhr.send(body);
             }
-            location.reload();
-            return true;
         }
         addEventListener("load", load_yaml)
     </script>
@@ -59,7 +57,7 @@
 <body>
 <h1>View and Edit Yaml</h1>
 <div class="centered">
-    <form onsubmit="post_yaml()">
+    <form onsubmit="post_yaml(); return false;">
         <label for="yaml">Edit Yaml:</label>
         <br><br>
         <textarea id="yaml" name="yaml" rows="30" cols="80"></textarea>
