@@ -72,15 +72,6 @@ impl Configuration {
         self
     }
 
-    pub fn remove_config(mut self, config_name: &str) -> Configuration {
-        self.configuration = self
-            .configuration
-            .into_iter()
-            .filter(|c| &(*c.to_string()) != config_name)
-            .collect();
-        self
-    }
-
     /// this function does checking, and removes duplicates to keep the last items
     pub fn from_yaml(yaml: &str) -> Result<Configuration, Error> {
         let config = match serde_yaml::from_str::<Configuration>(yaml) {
@@ -96,20 +87,6 @@ impl Configuration {
             new_config = new_config.add_config(c.check()?);
         }
         Ok(new_config)
-    }
-
-    pub fn to_yaml(&self) -> serde_yaml::Result<String> {
-        let yaml = serde_yaml::to_string(self)?;
-        let mut result = Vec::new();
-        let label_line = String::from("Label: ") + TASKER_TASK_NAME + ".";
-        for y in yaml.lines() {
-            if y.starts_with(&label_line) {
-                result.push(y.replace(&label_line, "Label: "));
-            } else {
-                result.push(String::from(y))
-            }
-        }
-        Ok(result.join("\n"))
     }
 
     pub fn to_plist(&self) -> String {
@@ -129,18 +106,18 @@ impl Configuration {
     }
 
     pub fn get_user_name(&self) -> Option<String> {
-        for conf in self.configuration {
+        for conf in &self.configuration {
             if let Config::UserName(name) = conf {
-                return Some(name);
+                return Some(name.to_string());
             }
         }
         None
     }
 
     pub fn get_group_name(&self) -> Option<String> {
-        for conf in self.configuration {
+        for conf in &self.configuration {
             if let Config::GroupName(name) = conf {
-                return Some(name);
+                return Some(name.to_string());
             }
         }
         None
@@ -456,7 +433,7 @@ mod test_config_mod {
 
     #[test]
     fn mock_config_yaml() {
-        let mut test_config = Configuration::new("com.tasker.tasks.test_task", "/usr/bin/python")
+        let test_config = Configuration::new("com.tasker.tasks.test_task", "/usr/bin/python")
             .add_config(Config::HardResourceLimits(ResourceLimit {
                 cpu: None,
                 file_size: None,
@@ -509,11 +486,11 @@ mod test_config_mod {
             + "Label: test_task\n"
             + "Program: /usr/bin/python\n"
             + "Configuration:\n"
-            + "  - UserName: Congyu WANG\n"
-            + "  - GroupName: staff\n"
             + "  - HardResourceLimits:\n"
             + "      NumberOfFiles: 10000\n"
             + "      NumberOfProcesses: 8\n"
+            + "  - UserName: Congyu WANG\n"
+            + "  - GroupName: staff\n"
             + "  - KeepAlive:\n"
             + "      SuccessfulExit: false\n"
             + "      OtherJobEnabled:\n"
