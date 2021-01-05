@@ -39,8 +39,8 @@
         }
     </style>
     <script type="text/javascript">
-        function verify(url) {
-            let se=confirm("Confirm your operation!");
+        function verify(url, task_name) {
+            let se=confirm("Confirm your operation on task: " + task_name);
             if (se) {
                 let xhr = new XMLHttpRequest();
                 xhr.open('GET', url, true);
@@ -113,23 +113,17 @@
                                 last_exit_status.innerHTML = last_exit_status_data;
                                 label.innerHTML = label_data;
                                 load.innerHTML = "<input type=\"button\" class='input warning' onclick=\"verify('/load?label="
-                                    + label_data
-                                    + "')\" value=\"load\" />";
+                                    + label_data + "', '" + label_data + "')\" value=\"load\" />";
                                 unload.innerHTML = "<input type=\"button\" class='input warning' onclick=\"verify('/unload?label="
-                                    + label_data
-                                    + "')\" value=\"unload\" />";
+                                    + label_data + "', '" + label_data + "')\" value=\"unload\" />";
                                 del.innerHTML = "<input type=\"button\" class='input dangerous' onclick=\"verify('/delete?label="
-                                    + label_data
-                                    + "')\" value=\"delete\" />";
+                                    + label_data + "', '" + label_data + "')\" value=\"delete\" />";
                                 stdout.innerHTML = "<input type=\"button\" class='input' onclick=\"window.open('/stdout?label="
-                                    + label_data
-                                    + "')\" value=\"stdout\" />";
+                                    + label_data + "')\" value=\"stdout\" />";
                                 stderr.innerHTML = "<input type=\"button\" class='input' onclick=\"window.open('/stderr?label="
-                                    + label_data
-                                    + "')\" value=\"stderr\" />";
+                                    + label_data + "')\" value=\"stderr\" />";
                                 yaml.innerHTML = "<input type=\"button\" class='input' onclick=\"window.open('/edit_yaml.html?label="
-                                    + label_data
-                                    + "')\" value=\"yaml\" />";
+                                    + label_data + "')\" value=\"yaml\" />";
 
                                 if (status_data === "ERROR") {
                                     row.style.backgroundColor = "#ff5e5e";
@@ -160,7 +154,7 @@
             );
         }
         addEventListener("load", load_table);
-        setInterval(load_table, 2000);
+        setInterval(load_table, 1000);
     </script>
 </head>
 <body>

@@ -36,3 +36,4 @@
     - minor improvements:
         - clear 'out' folder after 'yaml' update or 'create' submission
         - continuously update 'list' without reloading (UI improvement)
+        - alert name of task for each 'operation'
