@@ -28,7 +28,7 @@
                 if (xhr.status === 200) {
                     document.getElementById("yaml").value = xhr.responseText
                 } else {
-                    alert("failed to load yaml: " + xhr.status)
+                    alert("failed to load yaml: " + xhr.status + ":" + xhr.responseText)
                 }
             }
             xhr.send();
@@ -45,7 +45,7 @@
                     if (xhr.status === 200) {
                         alert(xhr.response)
                     } else {
-                        alert("failure: " + xhr.status)
+                        alert("failure: " + xhr.status + ":" + xhr.responseText)
                     }
                 }
                 xhr.send(body);
