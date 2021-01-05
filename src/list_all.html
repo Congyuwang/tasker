@@ -102,6 +102,14 @@
                                 row.style.justifyContent = "center"
                                 row.style.border = "1px solid #999"
 
+                                if (status_data === "ERROR") {
+                                    row.style.backgroundColor = "#ff5e5e";
+                                } else if (status_data === "NORMAL") {
+                                    row.style.backgroundColor = "#42d742";
+                                } else if (status_data === "RUNNING") {
+                                    row.style.backgroundColor = "#dbc242";
+                                }
+
                                 pid.innerHTML = pid_data;
                                 status.innerHTML = status_data;
                                 last_exit_status.innerHTML = last_exit_status_data;
