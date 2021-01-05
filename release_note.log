@@ -37,3 +37,8 @@
         - clear 'out' folder after 'yaml' update or 'create' submission
         - continuously update 'list' without reloading (UI improvement)
         - alert name of task for each 'operation'
+[0.2.0]
+    - refer to 'meta' folder for list of all tasks
+    - remove 'plist' after unloading
+    - add 'plist' before loading
+    - update yaml does not immediately load if task was unloaded
