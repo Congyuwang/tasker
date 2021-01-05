@@ -35,3 +35,4 @@
         - chown 'out' folder when 'username' has lower privilege
     - minor improvements:
         - clear 'out' folder after 'yaml' update or 'create' submission
+        - continuously update 'list' without reloading (UI improvement)
