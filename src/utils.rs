@@ -21,18 +21,6 @@ pub fn create_dir_check<P: AsRef<Path>>(dest: P) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn create_file_check<P: AsRef<Path>>(dest: P) -> Result<(), Error> {
-    if std::fs::metadata(&dest).is_err() {
-        return match std::fs::File::create(&dest) {
-            Ok(_) => Ok(()),
-            Err(_) => Err(Error::ErrorCreatingFolder(format!(
-                "File cannot be created"
-            ))),
-        };
-    }
-    Ok(())
-}
-
 pub fn delete_file_check<P: AsRef<Path>>(dest: P) -> Result<(), Error> {
     return if !std::fs::metadata(&dest).is_err() {
         match std::fs::remove_file(&dest) {

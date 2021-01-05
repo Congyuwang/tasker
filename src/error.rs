@@ -19,7 +19,7 @@ pub enum Error {
     FailedToUnloadTask(String),
     FailedToReplaceRootAlias(String),
     CommandExecutionError(String),
-    FailedToReadPlistFolder(String),
+    FailedToReadMetaFolder(String),
     FailedToClearTempFolder(String),
     WrongLabelInYaml(String),
     TaskDoesNotExist(String),

@@ -51,9 +51,22 @@ fn get_trash_folder_name(label_name: &str) -> PathBuf {
 }
 
 ///
+/// `load_task` takes the following steps:
+/// - read yaml from meta folder
+/// - process yaml
+/// - clear, create, and chown output folder
+/// - place plist in LaunchDaemons folder and load task
+///
+pub fn load_task(task_label: &str) -> Result<(), Error> {
+    let yaml = view_yaml(task_label)?;
+    let config = process_config(Configuration::from_yaml(&yaml)?)?;
+    place_plist_and_load(&config)
+}
+
+///
 /// execute launchctl load command, return error if already loaded
 ///
-pub fn load_task(task_label: &str) -> Result<String, Error> {
+fn load_inner(task_label: &str) -> Result<(), Error> {
     if is_loaded(task_label)? {
         return Err(Error::FailedToLoadTask(
             "task is already loaded".to_string(),
@@ -62,25 +75,43 @@ pub fn load_task(task_label: &str) -> Result<String, Error> {
     if !exist(task_label)? {
         return Err(Error::TaskDoesNotExist("no such task to load".to_string()));
     }
-    execute_command(Command::new("launchctl").args(&[
+    match execute_command(Command::new("launchctl").args(&[
         "load",
         get_plist_path(task_label).to_str().unwrap_or_default(),
-    ]))
+    ])) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
+    }
+}
+
+///
+/// always try to delete plist
+///
+pub fn unload_task(task_label: &str) -> Result<(), Error> {
+    let is_loaded = is_loaded(task_label)?;
+    if is_loaded {
+        unload_inner(task_label)?;
+    }
+    try_remove_plist(task_label);
+    if !is_loaded {
+        return Err(Error::FailedToUnloadTask(
+            "task is already unloaded or does not exist".to_string(),
+        ));
+    }
+    Ok(())
 }
 
 ///
 /// execute launchctl unload command, return error if already unloaded
 ///
-pub fn unload_task(task_label: &str) -> Result<String, Error> {
-    if !is_loaded(task_label)? {
-        return Err(Error::FailedToUnloadTask(
-            "task is already unloaded or does not exist".to_string(),
-        ));
-    }
-    execute_command(Command::new("launchctl").args(&[
+fn unload_inner(task_label: &str) -> Result<(), Error> {
+    match execute_command(Command::new("launchctl").args(&[
         "unload",
         get_plist_path(task_label).to_str().unwrap_or_default(),
-    ]))
+    ])) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
+    }
 }
 
 ///
@@ -89,10 +120,6 @@ pub fn unload_task(task_label: &str) -> Result<String, Error> {
 ///
 pub fn delete_task(task_label: &str) -> Result<(), Error> {
     match unload_task(task_label) {
-        Ok(_) => {}
-        Err(_) => {}
-    };
-    match delete_file_check(get_plist_path(task_label)) {
         Ok(_) => {}
         Err(_) => {}
     };
@@ -120,8 +147,6 @@ pub fn delete_task(task_label: &str) -> Result<(), Error> {
             Err(_) => {}
         }
     }
-
-    // remove yaml in meta
     match std::fs::remove_file(&yaml_in_meta) {
         Ok(_) => {}
         Err(_) => {}
@@ -130,6 +155,13 @@ pub fn delete_task(task_label: &str) -> Result<(), Error> {
     // move 'out' folder to trash
     try_clear_output(task_label);
     Ok(())
+}
+
+fn try_remove_plist(task_label: &str) {
+    match delete_file_check(get_plist_path(task_label)) {
+        Ok(_) => {}
+        Err(_) => {}
+    };
 }
 
 fn try_clear_output(task_label: &str) {
@@ -165,7 +197,6 @@ pub fn create_task(task_zip: &Path) -> Result<(), Error> {
         let label = &config.label.clone();
 
         // process configuration: view `process_config` documentation for detail
-        try_clear_output(&label[..]);
         config = process_config(config)?;
 
         // move yaml to meta folder
@@ -177,7 +208,7 @@ pub fn create_task(task_zip: &Path) -> Result<(), Error> {
         move_by_rename(&unzip_folder, task_folder_name.as_path())?;
 
         // place plist and load task
-        place_plist_and_load(&config, label)
+        place_plist_and_load(&config)
     } else {
         Err(Error::YamlError(
             "error reading yaml as utf8 text".to_string(),
@@ -230,11 +261,11 @@ pub fn update_yaml(yaml_content: &str, this_label: &str) -> Result<(), Error> {
         )));
     }
 
-    if is_loaded(label)? {
-        unload_task(label)?;
-    }
+    let is_loaded = is_loaded(label)?;
 
-    try_clear_output(label);
+    if is_loaded {
+        unload_inner(label)?;
+    }
 
     // process configuration: view `process_config` documentation for detail
     config = process_config(config)?;
@@ -243,7 +274,11 @@ pub fn update_yaml(yaml_content: &str, this_label: &str) -> Result<(), Error> {
     update_yaml_in_meta(yaml_content, label)?;
 
     // place plist and load task
-    place_plist_and_load(&config, label)
+    if is_loaded {
+        place_plist_and_load(&config)?
+    }
+
+    Ok(())
 }
 
 ///
@@ -276,7 +311,7 @@ fn replace_task_root_alias(config: &mut Configuration, task_label: &str) -> Resu
 ///
 /// configuration is processed here:
 /// - replace root alias
-/// - create output folder if not created
+/// - clear output folder
 /// - add or override stdout stderr path
 ///
 fn process_config(mut config: Configuration) -> Result<Configuration, Error> {
@@ -287,6 +322,7 @@ fn process_config(mut config: Configuration) -> Result<Configuration, Error> {
 
     // attempt to create task and output folder
     let task_output_name = get_output_folder_name(label);
+    try_clear_output(&label[..]);
     create_dir_check(&task_output_name)?;
 
     // chown for out directory
@@ -363,15 +399,17 @@ fn update_yaml_in_meta(yaml_content: &str, label: &String) -> Result<(), Error> 
 ///
 /// put plist into `/Library/LaunchDaemon` and load task
 ///
-fn place_plist_and_load(config: &Configuration, label: &String) -> Result<(), Error> {
+fn place_plist_and_load(config: &Configuration) -> Result<(), Error> {
+    let label = &config.label[..];
     let plist = config.to_plist();
+    try_remove_plist(label);
     if let Ok(mut plist_file) = std::fs::File::create(get_plist_path(label)) {
         match plist_file.write_all(plist.as_ref()) {
             Ok(_) => {
                 if is_loaded(label)? {
-                    unload_task(label)?;
+                    unload_inner(label)?;
                 }
-                load_task(label)?;
+                load_inner(label)?;
                 Ok(())
             }
             Err(_) => Err(Error::ErrorCreatingPlist("error writing plist".to_string())),
@@ -422,8 +460,8 @@ pub fn list(label_pattern: &str) -> Result<String, Error> {
 ///
 fn list_combined(label_pattern: &str) -> Result<Vec<TaskInfo>, Error> {
     let mut launchctl_info = launchctl_list(label_pattern)?;
-    let library_daemons_info = library_daemons_list(label_pattern)?;
-    for task in library_daemons_info {
+    let meta_yaml_info = meta_yaml_list(label_pattern)?;
+    for task in meta_yaml_info {
         if !launchctl_info.contains(&task) {
             launchctl_info.insert(task);
         }
@@ -458,18 +496,19 @@ fn launchctl_list(label_pattern: &str) -> Result<BTreeSet<TaskInfo>, Error> {
 /// This function obtains a list of tasks from `/Library/LaunchDaemons` folder and
 /// convert it into a vector of `TaskInfo`
 ///
-fn library_daemons_list(label_pattern: &str) -> Result<Vec<TaskInfo>, Error> {
+fn meta_yaml_list(label_pattern: &str) -> Result<Vec<TaskInfo>, Error> {
     lazy_static! {
-        static ref LABEL_REGEX: Regex = Regex::new("^(.+)\\.plist$").unwrap();
+        static ref LABEL_REGEX: Regex = Regex::new("^(.+)\\.yaml$").unwrap();
     }
-    if let Ok(dir) = Path::new(PLIST_FOLDER).read_dir() {
+    let meta_directory = &get_environment().unwrap().meta_dir;
+    if let Ok(dir) = meta_directory.read_dir() {
         let mut tasks: Vec<TaskInfo> = Vec::new();
         for file in dir {
             if let Ok(f) = file {
                 let path = f.path();
                 if let Some(file_name) = f.file_name().to_str() {
                     if path.is_file()
-                        && path.extension().unwrap_or_default().eq("plist")
+                        && path.extension().unwrap_or_default().eq("yaml")
                         && file_name.contains(label_pattern)
                         && file_name.contains(TASKER_TASK_NAME)
                     {
@@ -477,31 +516,33 @@ fn library_daemons_list(label_pattern: &str) -> Result<Vec<TaskInfo>, Error> {
                             if cap.len() == 2 {
                                 tasks.push(TaskInfo::from_just_label(&cap[1]));
                             } else {
-                                return Err(Error::FailedToReadPlistFolder(String::from(
-                                    "fail to find label in plist file name",
+                                return Err(Error::FailedToReadMetaFolder(String::from(
+                                    "fail to find label in yaml file name",
                                 )));
                             }
                         } else {
-                            return Err(Error::FailedToReadPlistFolder(String::from(
-                                "fail to capture label in plist file name",
+                            return Err(Error::FailedToReadMetaFolder(String::from(
+                                "fail to capture label in yaml file name",
                             )));
                         }
                     }
                 } else {
-                    return Err(Error::FailedToReadPlistFolder(String::from(
+                    return Err(Error::FailedToReadMetaFolder(String::from(
                         "unsupported character in file name",
                     )));
                 }
             } else {
-                return Err(Error::FailedToReadPlistFolder(
-                    String::from("cannot get file info in: ") + &PLIST_FOLDER,
+                return Err(Error::FailedToReadMetaFolder(
+                    String::from("cannot get file info in: ")
+                        + meta_directory.to_str().unwrap_or("unknown path"),
                 ));
             }
         }
         Ok(tasks)
     } else {
-        Err(Error::FailedToReadPlistFolder(
-            String::from("cannot list file in: ") + &PLIST_FOLDER,
+        Err(Error::FailedToReadMetaFolder(
+            String::from("cannot list file in: ")
+                + meta_directory.to_str().unwrap_or("unknown path"),
         ))
     }
 }

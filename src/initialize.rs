@@ -8,7 +8,6 @@ pub struct Env {
     port: u16,
     pub tasker_root: PathBuf,
     pub meta_dir: PathBuf,
-    pub meta_file: PathBuf,
     pub trash_dir: PathBuf,
     pub task_dir: PathBuf,
     pub out_dir: PathBuf,
@@ -23,7 +22,6 @@ static META_FOLDER: &str = "meta";
 static TASK_FOLDER: &str = "tasks";
 static TRASH_FOLDER: &str = "trash";
 static OUT_FOLDER: &str = "out";
-static META_FILE: &str = "tasker.meta";
 static DOMAIN_RE: &str = "^[A-Za-z0-9]{1,63}(\\.[A-Za-z0-9]{1,63})*$";
 
 pub fn get_environment() -> Option<&'static Env> {
@@ -78,8 +76,6 @@ impl Env {
         utils::create_dir_check(&trash_dir).expect("failed to create trash_dir");
         utils::create_dir_check(&task_dir).expect("failed to create task_dir");
         utils::create_dir_check(&out_dir).expect("failed to create out_dir");
-        let meta_file = meta_dir.join(META_FILE).to_owned();
-        utils::create_file_check(&meta_file).expect("failed to create meta file");
 
         // check domain and port number
         let domain: String = std::env::var("DOMAIN").unwrap_or_else(|_| "localhost".to_string());
@@ -97,7 +93,6 @@ impl Env {
             trash_dir,
             task_dir,
             out_dir,
-            meta_file,
             pk_dir,
             crt_dir,
             user_name,
