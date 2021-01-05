@@ -96,6 +96,7 @@ pub fn delete_task(task_label: &str) -> Result<(), Error> {
         Ok(_) => {}
         Err(_) => {}
     };
+
     // move 'task' folder to trash
     match move_by_rename(
         get_task_folder_name(task_label).as_path(),
@@ -104,7 +105,34 @@ pub fn delete_task(task_label: &str) -> Result<(), Error> {
         Ok(_) => {}
         Err(_) => {}
     };
+
+    // move yaml to trash
+    let yaml_in_meta = get_environment()
+        .unwrap()
+        .meta_dir
+        .join(String::from(task_label) + ".yaml");
+    if let Some(file_name) = yaml_in_meta.file_name() {
+        match std::fs::copy(
+            &yaml_in_meta,
+            get_trash_folder_name(task_label).join(file_name),
+        ) {
+            Ok(_) => {}
+            Err(_) => {}
+        }
+    }
+
+    // remove yaml in meta
+    match std::fs::remove_file(&yaml_in_meta) {
+        Ok(_) => {}
+        Err(_) => {}
+    };
+
     // move 'out' folder to trash
+    try_clear_output(task_label);
+    Ok(())
+}
+
+fn try_clear_output(task_label: &str) {
     match move_by_rename(
         get_output_folder_name(task_label).as_path(),
         get_trash_folder_name(task_label).join("out").as_path(),
@@ -112,18 +140,6 @@ pub fn delete_task(task_label: &str) -> Result<(), Error> {
         Ok(_) => {}
         Err(_) => {}
     };
-    // remove yaml in meta
-    match std::fs::remove_file(
-        get_environment()
-            .unwrap()
-            .meta_dir
-            .join(String::from(task_label) + ".yaml")
-            .as_path(),
-    ) {
-        Ok(_) => {}
-        Err(_) => {}
-    };
-    Ok(())
 }
 
 ///
@@ -217,6 +233,8 @@ pub fn update_yaml(yaml_content: &str, this_label: &str) -> Result<(), Error> {
         unload_task(label)?;
     }
 
+    try_clear_output(label);
+
     // process configuration: view `process_config` documentation for detail
     config = process_config(config)?;
 
@@ -257,7 +275,7 @@ fn replace_task_root_alias(config: &mut Configuration, task_label: &str) -> Resu
 ///
 /// configuration is processed here:
 /// - replace root alias
-/// - create output folder and task folder if not created
+/// - create output folder if not created
 /// - add or override stdout stderr path
 ///
 fn process_config(mut config: Configuration) -> Result<Configuration, Error> {
