@@ -22,3 +22,5 @@
     - jump to 'list' view after successful creation
 [0.1.7]
     - view and modify 'yaml'
+    - auto-refresh 'list' and 'list_all' every 5 seconds
+    - bug fixes: clear temp unzip folder if it exists before task creation
