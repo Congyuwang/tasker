@@ -128,6 +128,24 @@ impl Configuration {
             .join("\n")
     }
 
+    pub fn get_user_name(&self) -> Option<String> {
+        for conf in self.configuration {
+            if let Config::UserName(name) = conf {
+                return Some(name);
+            }
+        }
+        None
+    }
+
+    pub fn get_group_name(&self) -> Option<String> {
+        for conf in self.configuration {
+            if let Config::GroupName(name) = conf {
+                return Some(name);
+            }
+        }
+        None
+    }
+
     fn serde_plist<T>(ser: &T) -> Result<String, FromUtf8Error>
     where
         T: Serialize,
@@ -182,9 +200,9 @@ pub enum Config {
     EnvironmentVariables(BTreeMap<String, String>),
     KeepAlive(AliveCondition),
     RunAtLoad(bool),
-    WorkingDirectory(String),
     UserName(String),
     GroupName(String),
+    WorkingDirectory(String),
     RootDirectory(String),
     ExitTimeOut(i64),
     StartInterval(i64),
@@ -197,14 +215,9 @@ pub enum Config {
 }
 
 impl Config {
-    /// this function does checking
-    pub fn from_yaml(yaml: &str) -> Result<Config, Error> {
-        match serde_yaml::from_str::<Config>(yaml) {
-            Ok(config) => config.check(),
-            Err(e) => Err(Error::YamlError(e.to_string())),
-        }
-    }
-
+    ///
+    /// each configuration must satisfy several details
+    ///
     fn check(self) -> Result<Config, Error> {
         match self {
             Config::SoftResourceLimit(limit) => match limit.check() {
@@ -252,6 +265,26 @@ impl Config {
             Config::StandardErrorPath(p) => {
                 let p: String = Config::check_file(p)?;
                 Ok(Config::StandardErrorPath(p))
+            }
+            Config::UserName(name) => {
+                if users::get_user_by_name(&name).is_some() {
+                    Ok(Config::UserName(name))
+                } else {
+                    Err(Error::IllegalUserName(format!(
+                        "user `{}` does not exist",
+                        name
+                    )))
+                }
+            }
+            Config::GroupName(name) => {
+                if users::get_group_by_name(&name).is_some() {
+                    Ok(Config::GroupName(name))
+                } else {
+                    Err(Error::IllegalGroupName(format!(
+                        "group `{}` does not exist",
+                        name
+                    )))
+                }
             }
             _ => Ok(self),
         }
@@ -423,8 +456,7 @@ mod test_config_mod {
 
     #[test]
     fn mock_config_yaml() {
-        let test_config = Configuration::new("com.tasker.tasks.test_task", "/usr/bin/python")
-            .add_config(Config::StandardOutPath("/tmp/".parse().unwrap()))
+        let mut test_config = Configuration::new("com.tasker.tasks.test_task", "/usr/bin/python")
             .add_config(Config::HardResourceLimits(ResourceLimit {
                 cpu: None,
                 file_size: None,
@@ -433,6 +465,8 @@ mod test_config_mod {
                 resident_set_size: None,
                 stack: None,
             }))
+            .add_config(Config::UserName("Congyu WANG".to_string()))
+            .add_config(Config::GroupName("staff".to_string()))
             .add_config(Config::KeepAlive(AliveCondition {
                 crashed: Some(true),
                 other_job_enabled: Some({
@@ -475,7 +509,8 @@ mod test_config_mod {
             + "Label: test_task\n"
             + "Program: /usr/bin/python\n"
             + "Configuration:\n"
-            + "  - StandardOutPath: /tmp/\n"
+            + "  - UserName: Congyu WANG\n"
+            + "  - GroupName: staff\n"
             + "  - HardResourceLimits:\n"
             + "      NumberOfFiles: 10000\n"
             + "      NumberOfProcesses: 8\n"
@@ -506,91 +541,14 @@ mod test_config_mod {
     }
 
     #[test]
-    fn update_test_config() {
-        let test_config = Configuration::new("com.tasker.tasks.test_task", "/usr/bin/python")
-            .add_config(Config::StandardOutPath("/tmp/".parse().unwrap()))
-            .add_config(Config::StandardOutPath("/var/tmp/".parse().unwrap()));
-
-        let expected_deserialized = String::new()
-            + "---\n"
-            + "Label: test_task\n"
-            + "Program: /usr/bin/python\n"
-            + "Configuration:\n"
-            + "  - StandardOutPath: /var/tmp/";
-
-        assert_eq!(test_config.to_yaml().unwrap(), expected_deserialized);
-
-        assert_eq!(
-            Configuration::from_yaml(&expected_deserialized).unwrap(),
-            test_config,
-        );
-    }
-
-    #[test]
-    fn update_test_config_from_yaml() {
-        let mut test_config = Configuration::new("test_task", "/usr/bin/python")
-            .add_config(Config::StandardOutPath("/tmp/".parse().unwrap()));
-
-        let yaml_to_add = String::new()
-            + "---\n"
-            + "StartCalendarInterval:\n"
-            + "  - Minute: 15\n"
-            + "    Hour: 9\n";
-
-        let expected_deserialized = String::new()
-            + "---\n"
-            + "Label: test_task\n"
-            + "Program: /usr/bin/python\n"
-            + "Configuration:\n"
-            + "  - StandardOutPath: /tmp/\n"
-            + "  - StartCalendarInterval:\n"
-            + "      - Minute: 15\n"
-            + "        Hour: 9";
-
-        test_config = test_config.add_config(Config::from_yaml(&yaml_to_add).unwrap());
-
-        assert_eq!(test_config.to_yaml().unwrap(), expected_deserialized);
-    }
-
-    #[test]
-    fn test_remove_config() {
-        let test_config = Configuration::new("test_task", "/usr/bin/python")
-            .add_config(Config::StandardOutPath("/tmp/".parse().unwrap()))
-            .add_config(Config::KeepAlive(AliveCondition {
-                crashed: Some(true),
-                successful_exit: Some(false),
-                other_job_enabled: None,
-            }))
-            .add_config(Config::StartCalendarInterval(vec![CalendarInterval {
-                minute: Some(15),
-                hour: Some(9),
-                day: None,
-                weekday: None,
-                month: None,
-            }]))
-            .remove_config("KeepAlive");
-
-        let expected_deserialized = String::new()
-            + "---\n"
-            + "Label: test_task\n"
-            + "Program: /usr/bin/python\n"
-            + "Configuration:\n"
-            + "  - StandardOutPath: /tmp/\n"
-            + "  - StartCalendarInterval:\n"
-            + "      - Minute: 15\n"
-            + "        Hour: 9";
-
-        assert_eq!(test_config.to_yaml().unwrap(), expected_deserialized);
-    }
-
-    #[test]
     fn test_get_plist() {
         let yaml_config = String::new()
             + "---\n"
             + "Label: test_task\n"
             + "Program: /usr/bin/python\n"
             + "Configuration:\n"
-            + "  - StandardOutPath: /tmp/\n"
+            + "  - UserName: Congyu WANG\n"
+            + "  - GroupName: staff\n"
             + "  - KeepAlive:\n"
             + "      Crashed: true\n"
             + "      OtherJobEnabled:\n"
@@ -620,8 +578,10 @@ mod test_config_mod {
             + "test_task</string>\n"
             + "\t<key>Program</key>\n"
             + "\t<string>/usr/bin/python</string>\n"
-            + "\t<key>StandardOutPath</key>\n"
-            + "\t<string>/tmp/</string>\n"
+            + "\t<key>UserName</key>\n"
+            + "\t<string>Congyu WANG</string>\n"
+            + "\t<key>GroupName</key>\n"
+            + "\t<string>staff</string>\n"
             + "\t<key>KeepAlive</key>\n"
             + "\t<dict>\n"
             + "\t\t<key>SuccessfulExit</key>\n"
@@ -679,13 +639,12 @@ mod test_config_mod {
             + "Label: test_task\n"
             + "Program: /usr/bin/python\n"
             + "Configuration:\n"
-            + "  - StandardOutPath: /tmp/\n"
             + "  - StartCalendarInterval:\n"
             + "      - Minute: 15\n"
             + "        Hour: 9\n"
             + "  - NoSuchAttribute";
 
-        let config = Configuration::from_yaml(&yaml).unwrap();
+        let _config = Configuration::from_yaml(&yaml).unwrap();
     }
 
     #[test]
@@ -695,12 +654,11 @@ mod test_config_mod {
             + "---\n"
             + "Label: test_task\n"
             + "Configuration:\n"
-            + "  - StandardOutPath: /tmp/\n"
             + "  - StartCalendarInterval:\n"
             + "      - Minute: 15\n"
             + "        Hour: 9\n";
 
-        let config = Configuration::from_yaml(&yaml).unwrap();
+        let _config = Configuration::from_yaml(&yaml).unwrap();
     }
 
     #[test]
@@ -711,12 +669,11 @@ mod test_config_mod {
             + "Label: test_task\n"
             + "Program: /usr/bin/python\n"
             + "Configuration:\n"
-            + "  - StandardOutPath: /tmp/\n"
             + "  - StartCalendarInterval:\n"
             + "      - Minute: 15\n"
             + "        Hour: 30";
 
-        let config = Configuration::from_yaml(&yaml).unwrap();
+        let _config = Configuration::from_yaml(&yaml).unwrap();
     }
 
     #[test]
@@ -732,7 +689,7 @@ mod test_config_mod {
             + "      - Minute: 15\n"
             + "        Hour: 20";
 
-        let config = Configuration::from_yaml(&yaml).unwrap();
+        let _config = Configuration::from_yaml(&yaml).unwrap();
     }
 
     #[test]
@@ -748,11 +705,11 @@ mod test_config_mod {
             + "      - Minute: 15\n"
             + "        Hour: 20";
 
-        let config = Configuration::from_yaml(&yaml).unwrap();
+        let _config = Configuration::from_yaml(&yaml).unwrap();
     }
 
     #[test]
-    #[should_panic(expected = "`/tmp/no such path` is not a directory")]
+    #[should_panic(expected = "`/tmp/no such path` is not a file")]
     fn config_panic_standard_out_path() {
         let yaml = String::new()
             + "---\n"
@@ -764,6 +721,6 @@ mod test_config_mod {
             + "      - Minute: 15\n"
             + "        Hour: 20";
 
-        let config = Configuration::from_yaml(&yaml).unwrap();
+        let _config = Configuration::from_yaml(&yaml).unwrap();
     }
 }

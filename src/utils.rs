@@ -1,8 +1,12 @@
 use crate::error::Error;
+use std::ffi::CString;
 use std::fs::File;
 use std::io::Read;
+use std::os::macos::fs::MetadataExt;
+use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use users::{Group, User};
 use zip;
 
 pub fn create_dir_check<P: AsRef<Path>>(dest: P) -> Result<(), Error> {
@@ -193,4 +197,71 @@ fn move_by_rename_inner(from: &Path, to: &Path) -> Result<(), std::io::Error> {
     std::fs::remove_dir_all(from).unwrap();
 
     Ok(())
+}
+
+///
+/// chown function for path
+///
+pub fn chown_by_name(
+    path: &Path,
+    username: Option<String>,
+    group_name: Option<String>,
+) -> Result<(), Error> {
+    let (uid, gid) = get_user_group_pair_id(path, username, group_name)?;
+    if let Ok(path) = CString::new(path.as_os_str().as_bytes()) {
+        if unsafe { libc::chown(path.as_ptr(), uid, gid) } == 0 {
+            return Ok(());
+        }
+    }
+    Err(Error::FailedToChown(format!(
+        "failed to change owner ship of `{}`",
+        path.to_str().unwrap_or("unknown path")
+    )))
+}
+
+///
+/// Convert `(user name, group name)` to `(user id, group id)` pair,
+/// and find primary group if only user is supplied.
+/// It return the original uid of the file for uid if only group is supplied.
+///
+fn get_user_group_pair_id(
+    path: &Path,
+    username: Option<String>,
+    group_name: Option<String>,
+) -> Result<(u32, u32), Error> {
+    if let Ok(meta) = std::fs::metadata(&path) {
+        let user: Option<User> = match username {
+            None => None,
+            Some(name) => match users::get_user_by_name(&name) {
+                None => None,
+                Some(u) => Some(u),
+            },
+        };
+
+        let group: Option<Group> = match group_name {
+            None => None,
+            Some(name) => match users::get_group_by_name(&name) {
+                None => None,
+                Some(g) => Some(g),
+            },
+        };
+
+        match user {
+            None => {
+                if let Some(g) = group {
+                    Ok((meta.st_uid(), g.gid()))
+                } else {
+                    Ok((meta.st_uid(), meta.st_gid()))
+                }
+            }
+            Some(u) => match group {
+                None => Ok((u.uid(), u.primary_group_id())),
+                Some(g) => Ok((u.uid(), g.gid())),
+            },
+        }
+    } else {
+        Err(Error::PathDoesNotExist(format!(
+            "path does not exist in chown"
+        )))
+    }
 }

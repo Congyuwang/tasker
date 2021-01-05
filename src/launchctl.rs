@@ -3,8 +3,8 @@ use crate::config::{Config, Configuration};
 use crate::error::Error;
 use crate::initialize::get_environment;
 use crate::utils::{
-    create_dir_check, decompress, delete_file_check, execute_command, move_by_rename,
-    read_utf8_file,
+    chown_by_name, create_dir_check, decompress, delete_file_check, execute_command,
+    move_by_rename, read_utf8_file,
 };
 use crate::{
     PLIST_FOLDER, STD_ERR_FILE, STD_OUT_FILE, TASKER_TASK_NAME, TASK_ROOT_ALIAS, TEMP_UNZIP_FOLDER,
@@ -287,6 +287,13 @@ fn process_config(mut config: Configuration) -> Result<Configuration, Error> {
     // attempt to create task and output folder
     let task_output_name = get_output_folder_name(label);
     create_dir_check(&task_output_name)?;
+
+    // chown for out directory
+    chown_by_name(
+        &task_output_name,
+        config.get_user_name(),
+        config.get_group_name(),
+    )?;
 
     let mut temp;
 

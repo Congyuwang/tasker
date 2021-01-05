@@ -29,3 +29,5 @@
         - copy 'yaml' to trash folder before deletion
         - clear 'out' folder after updating 'yaml'
         - disable 'stderr', 'stdout' button if there is no output
+[0.1.8]
+    - allow optional 'UserName' and 'GroupName' setting

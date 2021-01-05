@@ -24,4 +24,9 @@ pub enum Error {
     WrongLabelInYaml(String),
     TaskDoesNotExist(String),
     FailedToUpdateMetaYaml(String),
+    IllegalUserName(String),
+    IllegalGroupName(String),
+    NeitherGroupOrUserSupplied(String),
+    FailedToChown(String),
+    PathDoesNotExist(String),
 }
