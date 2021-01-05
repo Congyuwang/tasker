@@ -33,3 +33,5 @@
     - allow optional 'UserName' and 'GroupName' setting
     - bug fixes:
         - chown 'out' folder when 'username' has lower privilege
+    - minor improvements:
+        - clear 'out' folder after 'yaml' update or 'create' submission

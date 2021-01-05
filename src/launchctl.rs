@@ -165,6 +165,7 @@ pub fn create_task(task_zip: &Path) -> Result<(), Error> {
         let label = &config.label.clone();
 
         // process configuration: view `process_config` documentation for detail
+        try_clear_output(&label[..]);
         config = process_config(config)?;
 
         // move yaml to meta folder
