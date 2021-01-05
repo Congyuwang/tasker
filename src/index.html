@@ -138,6 +138,14 @@
     <button type="submit">load</button>
 </form>
 
+<h2>View YAML</h2>
+<form method="get" onsubmit="window.open('./yaml?label='+document.getElementById('yaml').value)">
+    <label for="yaml">view output log</label>
+    <br><br>
+    <input id="yaml" type="search" name="label" required>
+    <button type="submit">search</button>
+</form>
+
 <h2>View Stdout</h2>
 <form method="get" onsubmit="window.open('./stdout?label='+document.getElementById('stdout').value)">
     <label for="stdout">view output log</label>

@@ -20,6 +20,7 @@ use std::process::Command;
 #[derive(Debug, Serialize)]
 pub enum Status {
     RUNNING,
+    LOADED,
     UNLOADED,
     NORMAL,
     ERROR,
@@ -49,6 +50,9 @@ fn get_trash_folder_name(label_name: &str) -> PathBuf {
     get_environment().unwrap().trash_dir.join(label_name)
 }
 
+///
+/// execute launchctl load command, return error if already loaded
+///
 pub fn load_task(task_label: &str) -> Result<String, Error> {
     if is_loaded(task_label)? {
         return Err(Error::FailedToLoadTask(
@@ -61,6 +65,9 @@ pub fn load_task(task_label: &str) -> Result<String, Error> {
     ]))
 }
 
+///
+/// execute launchctl unload command, return error if already unloaded
+///
 pub fn unload_task(task_label: &str) -> Result<String, Error> {
     if !is_loaded(task_label)? {
         return Err(Error::FailedToUnloadTask(
@@ -116,7 +123,109 @@ pub fn delete_task(task_label: &str) -> Result<(), Error> {
     Ok(())
 }
 
-pub fn replace_task_root_alias(config: &mut Configuration, task_label: &str) -> Result<(), Error> {
+///
+/// create a new task based on a zip package
+///
+pub fn create_task(task_zip: &Path) -> Result<(), Error> {
+    let unzip_folder = Path::new(TEMP_UNZIP_FOLDER);
+    match std::fs::remove_dir_all(unzip_folder) {
+        Ok(_) => {}
+        Err(_) => {
+            return Err(Error::FailedToClearTempFolder(
+                "cannot clear folder: ".to_string() + TEMP_UNZIP_FOLDER,
+            ))
+        }
+    };
+    decompress(&task_zip, Path::new(TEMP_UNZIP_FOLDER))?;
+    let yaml = find_yaml_file(&unzip_folder)?;
+
+    return if let Ok(yaml_content) = read_utf8_file(&yaml) {
+        let mut config = Configuration::from_yaml(&yaml_content)?;
+        let label = &config.label.clone();
+
+        // process configuration: view `process_config` documentation for detail
+        config = process_config(config)?;
+
+        // move yaml to meta folder
+        move_yaml_to_meta(&yaml, label)?;
+
+        // move the files to task folder
+        let task_folder_name = get_task_folder_name(label);
+        create_dir_check(&task_folder_name)?;
+        move_by_rename(&unzip_folder, task_folder_name.as_path())?;
+
+        // place plist and load task
+        place_plist_and_load(&config, label)
+    } else {
+        Err(Error::YamlError(
+            "error reading yaml as utf8 text".to_string(),
+        ))
+    };
+}
+
+///
+/// find the position of yaml in zip package
+///
+fn find_yaml_file(unzipped_folder: &Path) -> Result<PathBuf, Error> {
+    return if let Ok(path) = unzipped_folder.read_dir() {
+        // loop over entries
+        for entry in path {
+            if let Ok(entry) = entry {
+                let path = entry.path();
+                if let Some(ext) = path.extension() {
+                    if ext.eq("yaml") {
+                        return Ok(path);
+                    }
+                }
+            }
+        }
+        Err(Error::YamlNotFound("yaml not found".to_owned()))
+    } else {
+        Err(Error::YamlNotFound(
+            "cannot read unzipped folder".to_owned(),
+        ))
+    };
+}
+
+///
+/// update yaml after editing yaml
+///
+pub fn update_yaml(yaml_content: &str, this_label: &str) -> Result<(), Error> {
+    let mut config = Configuration::from_yaml(&yaml_content)?;
+    let label = &config.label.clone();
+
+    if !label.eq(this_label) {
+        return Err(Error::WrongLabelInYaml(format!(
+            "label `{}` must be `{}`",
+            label, this_label
+        )));
+    }
+
+    if !exist(label)? {
+        return Err(Error::TaskDoesNotExist(format!(
+            "task with label `{}` does not exist",
+            label
+        )));
+    }
+
+    if is_loaded(label)? {
+        unload_task(label)?;
+    }
+
+    // process configuration: view `process_config` documentation for detail
+    config = process_config(config)?;
+
+    // move yaml in meta folder
+    update_yaml_in_meta(yaml_content, label)?;
+
+    // place plist and load task
+    place_plist_and_load(&config, label)
+}
+
+///
+/// this function replaces ROOT_ALIAS to root folder for each task
+///
+fn replace_task_root_alias(config: &mut Configuration, task_label: &str) -> Result<(), Error> {
     let configuration = &mut config.configuration;
     let task_folder = get_task_folder_name(task_label);
     for conf in configuration {
@@ -140,110 +249,106 @@ pub fn replace_task_root_alias(config: &mut Configuration, task_label: &str) -> 
     Ok(())
 }
 
-pub fn create_task(task_zip: &Path) -> Result<(), Error> {
-    let unzip_folder = Path::new(TEMP_UNZIP_FOLDER);
-    match std::fs::remove_dir_all(unzip_folder) {
-        Ok(_) => {}
-        Err(_) => {
-            return Err(Error::FailedToClearTempFolder(
-                "cannot clear folder: ".to_string() + TEMP_UNZIP_FOLDER,
-            ))
-        }
-    };
-    decompress(&task_zip, Path::new(TEMP_UNZIP_FOLDER))?;
-    let yaml = get_yaml(&unzip_folder)?;
+///
+/// configuration is processed here:
+/// - replace root alias
+/// - create output folder and task folder if not created
+/// - add or override stdout stderr path
+///
+fn process_config(mut config: Configuration) -> Result<Configuration, Error> {
 
-    return if let Ok(yaml_content) = read_utf8_file(&yaml) {
-        let mut config = Configuration::from_yaml(&yaml_content)?;
-        let label = &config.label.clone();
+    let label = &config.label.clone();
 
-        if is_loaded(label)? {
-            unload_task(label)?;
-        }
+    // replace root alias
+    replace_task_root_alias(&mut config, label)?;
 
-        replace_task_root_alias(&mut config, label)?;
+    // attempt to create task and output folder
+    let task_output_name = get_output_folder_name(label);
+    create_dir_check(&task_output_name)?;
 
-        // attempt to create task and output folder
-        let task_folder_name = get_task_folder_name(label);
-        let task_output_name = get_output_folder_name(label);
-        create_dir_check(&task_folder_name)?;
-        create_dir_check(&task_output_name)?;
+    let mut temp;
 
-        // create stdout and stderr files
-        if let Some(std_out_file) = task_output_name.join(STD_OUT_FILE).to_str() {
-            config = config.add_config(Config::StandardOutPath(std_out_file.to_string()));
-        } else {
-            return Err(Error::NonUtfError(
-                "non-utf8 character not supported in stdout/stderr path".to_string(),
-            ));
-        }
-        if let Some(std_err_file) = task_output_name.join(STD_ERR_FILE).to_str() {
-            config = config.add_config(Config::StandardErrorPath(std_err_file.to_string()));
-        } else {
-            return Err(Error::NonUtfError(
-                "non-utf8 character not supported in stdout/stderr path".to_string(),
-            ));
-        }
-
-        // copy yaml to meta folder
-        match std::fs::copy(
-            &yaml,
-            get_environment()
-                .unwrap()
-                .meta_dir
-                .join(String::from(label) + ".yaml")
-                .as_path(),
-        ) {
-            Ok(_) => {}
-            Err(_) => {
-                return Err(Error::ErrorCopyYamlToMeta(
-                    "error writing plist".to_string(),
-                ))
-            }
-        }
-
-        // move the files to task folder
-        move_by_rename(&unzip_folder, task_folder_name.as_path())?;
-
-        // place plist
-        let plist = config.to_plist();
-        if let Ok(mut plist_file) = std::fs::File::create(get_plist_path(label)) {
-            match plist_file.write_all(plist.as_ref()) {
-                Ok(_) => {
-                    load_task(label)?;
-                    Ok(())
-                }
-                Err(_) => Err(Error::ErrorCreatingPlist("error writing plist".to_string())),
-            }
-        } else {
-            Err(Error::ErrorCreatingPlist("cannot create plist".to_string()))
-        }
+    // add or override stdout stderr path
+    if let Some(std_out_file) = task_output_name.join(STD_OUT_FILE).to_str() {
+        temp = config.add_config(Config::StandardOutPath(std_out_file.to_string()));
     } else {
-        Err(Error::YamlError(
-            "error reading yaml as utf8 text".to_string(),
-        ))
-    };
+        return Err(Error::NonUtfError(
+            "non-utf8 character not supported in stdout/stderr path".to_string(),
+        ));
+    }
+    if let Some(std_err_file) = task_output_name.join(STD_ERR_FILE).to_str() {
+        temp = temp.add_config(Config::StandardErrorPath(std_err_file.to_string()));
+    } else {
+        return Err(Error::NonUtfError(
+            "non-utf8 character not supported in stdout/stderr path".to_string(),
+        ));
+    }
+    Ok(temp)
 }
 
-pub fn get_yaml(unzipped_folder: &Path) -> Result<PathBuf, Error> {
-    return if let Ok(path) = unzipped_folder.read_dir() {
-        // loop over entries
-        for entry in path {
-            if let Ok(entry) = entry {
-                let path = entry.path();
-                if let Some(ext) = path.extension() {
-                    if ext.eq("yaml") {
-                        return Ok(path);
-                    }
-                }
-            }
+///
+/// move yaml file to meta folder
+///
+fn move_yaml_to_meta(yaml: &PathBuf, label: &String) -> Result<(), Error> {
+    match std::fs::copy(
+        &yaml,
+        get_environment()
+            .unwrap()
+            .meta_dir
+            .join(String::from(label) + ".yaml")
+            .as_path(),
+    ) {
+        Ok(_) => {}
+        Err(_) => {
+            return Err(Error::ErrorMoveYamlToMeta(
+                "cannot copy yaml to meta folder".to_string(),
+            ))
         }
-        Err(Error::YamlNotFound("yaml not found".to_owned()))
+    }
+
+    match std::fs::remove_file(&yaml) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(Error::ErrorMoveYamlToMeta(
+            "cannot delete old yaml".to_string(),
+        )),
+    }
+}
+
+fn update_yaml_in_meta(yaml_content: &str, label: &String) -> Result<(), Error> {
+    match std::fs::write(
+        get_environment()
+            .unwrap()
+            .meta_dir
+            .join(String::from(label) + ".yaml")
+            .as_path(),
+        yaml_content,
+    ) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(Error::FailedToUpdateMetaYaml(
+            "cannot write yaml".to_string(),
+        )),
+    }
+}
+
+///
+/// put plist into `/Library/LaunchDaemon` and load task
+///
+fn place_plist_and_load(config: &Configuration, label: &String) -> Result<(), Error> {
+    let plist = config.to_plist();
+    if let Ok(mut plist_file) = std::fs::File::create(get_plist_path(label)) {
+        match plist_file.write_all(plist.as_ref()) {
+            Ok(_) => {
+                if is_loaded(label)? {
+                    unload_task(label)?;
+                }
+                load_task(label)?;
+                Ok(())
+            }
+            Err(_) => Err(Error::ErrorCreatingPlist("error writing plist".to_string())),
+        }
     } else {
-        Err(Error::YamlNotFound(
-            "cannot read unzipped folder".to_owned(),
-        ))
-    };
+        Err(Error::ErrorCreatingPlist("cannot create plist".to_string()))
+    }
 }
 
 pub fn is_loaded(label_pattern: &str) -> Result<bool, Error> {
@@ -256,7 +361,36 @@ pub fn is_loaded(label_pattern: &str) -> Result<bool, Error> {
     Ok(false)
 }
 
+pub fn exist(label_pattern: &str) -> Result<bool, Error> {
+    let task_list = list_combined(label_pattern)?;
+    for t in task_list {
+        if t.label.eq(label_pattern) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+///
+/// This function provides an API by returning a JSON of `TaskInfo` returned by
+/// `list_combined`
+///
 pub fn list(label_pattern: &str) -> Result<String, Error> {
+    let task_info = list_combined(label_pattern)?;
+    match serde_json::to_string_pretty(&task_info) {
+        Ok(s) => Ok(s),
+        Err(_) => {
+            return Err(Error::LaunchctlListError(
+                "list error: serialize error".parse().unwrap(),
+            ))
+        }
+    }
+}
+
+///
+/// This function combines the result of `launchctl_list` and `library_daemons_list`
+///
+pub fn list_combined(label_pattern: &str) -> Result<Vec<TaskInfo>, Error> {
     let mut launchctl_info = launchctl_list(label_pattern)?;
     let library_daemons_info = library_daemons_list(label_pattern)?;
     for task in library_daemons_info {
@@ -268,16 +402,13 @@ pub fn list(label_pattern: &str) -> Result<String, Error> {
     for task in launchctl_info {
         task_info.push(task);
     }
-    match serde_json::to_string_pretty(&task_info) {
-        Ok(s) => Ok(s),
-        Err(_) => {
-            return Err(Error::LaunchctlListError(
-                "list error: serialize error".parse().unwrap(),
-            ))
-        }
-    }
+    Ok(task_info)
 }
 
+///
+/// This function obtains a list of tasks from the launchctl command and
+/// convert it into a Set of `TaskInfo`.
+///
 pub fn launchctl_list(label_pattern: &str) -> Result<BTreeSet<TaskInfo>, Error> {
     match execute_command(Command::new("launchctl").arg("list")) {
         Ok(list_output) => {
@@ -293,6 +424,10 @@ pub fn launchctl_list(label_pattern: &str) -> Result<BTreeSet<TaskInfo>, Error> 
     }
 }
 
+///
+/// This function obtains a list of tasks from `/Library/LaunchDaemons` folder and
+/// convert it into a vector of `TaskInfo`
+///
 pub fn library_daemons_list(label_pattern: &str) -> Result<Vec<TaskInfo>, Error> {
     lazy_static! {
         static ref LABEL_REGEX: Regex = Regex::new("^(.+)\\.plist$").unwrap();
@@ -338,6 +473,20 @@ pub fn library_daemons_list(label_pattern: &str) -> Result<Vec<TaskInfo>, Error>
         Err(Error::FailedToReadPlistFolder(
             String::from("cannot list file in: ") + &PLIST_FOLDER,
         ))
+    }
+}
+
+pub fn view_yaml(label: &str) -> Result<String, Error> {
+    let yaml_file = get_environment()
+        .unwrap()
+        .meta_dir
+        .join(String::from(label) + ".yaml");
+    match read_utf8_file(yaml_file.as_path()) {
+        Ok(s) => Ok(s),
+        Err(e) => Err(Error::NonUtfError(format!(
+            "cannot find or read yaml file: {:?}",
+            e
+        ))),
     }
 }
 
@@ -400,6 +549,8 @@ impl TaskInfo {
             status = Status::RUNNING
         } else if last_exit_status.unwrap() != 0 {
             status = Status::ERROR
+        } else if view_std_out(&label).is_err() {
+            status = Status::LOADED
         }
         TaskInfo {
             pid,

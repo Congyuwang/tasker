@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Yaml</title>
+    <style>
+        h1 {
+            background-color: #e2fdb3;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+        }
+        .centered {
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+        }
+    </style>
+    <script>
+        function load_yaml() {
+            let url = new URL(location.href);
+            let label = url.searchParams.get("label");
+            let xhr = new XMLHttpRequest();
+            xhr.open('GET', "/get_yaml?label=" + label, true);
+            xhr.responseType = "text"
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    document.getElementById("yaml").value = xhr.responseText
+                } else {
+                    alert("failed to load yaml: " + xhr.status)
+                }
+            }
+            xhr.send();
+        }
+        function post_yaml() {
+            if (confirm("Confirm to save yaml!")) {
+                let url = new URL(location.href);
+                let label = url.searchParams.get("label");
+                let xhr = new XMLHttpRequest();
+                let body = document.getElementById("yaml").value;
+                xhr.open('POST', "/post_yaml?label=" + label, true);
+                xhr.responseType = "text"
+                xhr.onload = function() {
+                    if (xhr.status === 200) {
+                        alert(xhr.response)
+                    } else {
+                        alert("failure: " + xhr.status)
+                    }
+                }
+                xhr.send(body);
+            }
+            return true;
+        }
+        addEventListener("load", load_yaml)
+    </script>
+</head>
+<body>
+<h1>View and Edit Yaml</h1>
+<div class="centered">
+    <form onsubmit="post_yaml()">
+        <label for="yaml">Edit Yaml:</label>
+        <br><br>
+        <textarea id="yaml" name="yaml" rows="30" cols="80"></textarea>
+        <br><br>
+        <input type="submit" value="Save">
+    </form>
+</div>
+</body>
+</html>

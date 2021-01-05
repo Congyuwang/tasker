@@ -36,6 +36,8 @@ async fn main() -> std::io::Result<()> {
             .service(server::unload_param)
             .service(server::stderr_param)
             .service(server::stdout_param)
+            .service(server::get_yaml)
+            .service(server::post_yaml)
             .service(
                 web::resource("/")
                     .route(web::get().to(server::index))
@@ -43,6 +45,7 @@ async fn main() -> std::io::Result<()> {
             )
             .service(web::resource("/list_all").route(web::get().to(server::list_all)))
             .service(web::resource("/list").route(web::get().to(server::list_part)))
+            .service(web::resource("/yaml").route(web::get().to(server::edit_yaml)))
             .service(server::list_raw_json)
     });
 

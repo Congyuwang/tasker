@@ -1,11 +1,12 @@
 use crate::launchctl::{
-    create_task, delete_task, list, load_task, unload_task, view_std_err, view_std_out,
+    create_task, delete_task, list, load_task, unload_task, update_yaml, view_std_err,
+    view_std_out, view_yaml,
 };
 use actix_multipart::{Field, Multipart};
 use actix_web::body::Body;
 use actix_web::http::StatusCode;
 use actix_web::web::Query;
-use actix_web::{get, web, HttpResponse, Responder};
+use actix_web::{get, post, web, HttpResponse, Responder};
 use futures::{StreamExt, TryStreamExt};
 use serde::Deserialize;
 use std::io::Write;
@@ -15,6 +16,7 @@ static INDEX_HTML: &'static str = include_str!("index.html");
 static LIST_ALL_HTML: &'static str = include_str!("list_all.html");
 static LIST_PART_HTML: &'static str = include_str!("list_part.html");
 static CREATE_SUCCESS: &'static str = include_str!("create_success.html");
+static EDIT_YAML: &'static str = include_str!("edit_yaml.html");
 static MB_LIMIT: usize = 20;
 static SIZE_LIMIT: usize = MB_LIMIT * 1024 * 1024;
 static TEMP_ZIP: &str = "/tmp/tasker.task.temp.zip";
@@ -33,6 +35,10 @@ pub fn list_part() -> HttpResponse {
 
 pub fn create_success() -> HttpResponse {
     HttpResponse::Ok().body(CREATE_SUCCESS)
+}
+
+pub fn edit_yaml() -> HttpResponse {
+    HttpResponse::Ok().body(EDIT_YAML)
 }
 
 ///
@@ -101,7 +107,7 @@ pub async fn delete_param(param: Query<Label>) -> impl Responder {
     let delete_result = delete_task(&param.label);
     match delete_result {
         Ok(_) => HttpResponse::Ok().body("Successfully deleted task"),
-        Err(e) => HttpResponse::InternalServerError().body(format!("{:?}", e)),
+        Err(e) => HttpResponse::BadRequest().body(format!("{:?}", e)),
     }
 }
 
@@ -110,7 +116,7 @@ pub async fn load_param(param: Query<Label>) -> impl Responder {
     let load_task = load_task(&param.label);
     match load_task {
         Ok(_) => HttpResponse::Ok().body("Successfully loaded task"),
-        Err(e) => HttpResponse::InternalServerError().body(format!("{:?}", e)),
+        Err(e) => HttpResponse::BadRequest().body(format!("{:?}", e)),
     }
 }
 
@@ -119,24 +125,42 @@ pub async fn unload_param(param: Query<Label>) -> impl Responder {
     let unload_task = unload_task(&param.label);
     match unload_task {
         Ok(_) => HttpResponse::Ok().body("Successfully unloaded task"),
-        Err(e) => HttpResponse::InternalServerError().body(format!("{:?}", e)),
+        Err(e) => HttpResponse::BadRequest().body(format!("{:?}", e)),
     }
 }
 
 #[get("/stdout")]
 pub async fn stdout_param(param: Query<Label>) -> impl Responder {
-    let unload_task = view_std_out(&param.label);
-    match unload_task {
+    let out = view_std_out(&param.label);
+    match out {
         Ok(s) => HttpResponse::Ok().body(s),
-        Err(e) => HttpResponse::InternalServerError().body(format!("{:?}", e)),
+        Err(e) => HttpResponse::BadRequest().body(format!("{:?}", e)),
     }
 }
 
 #[get("/stderr")]
 pub async fn stderr_param(param: Query<Label>) -> impl Responder {
-    let unload_task = view_std_err(&param.label);
-    match unload_task {
+    let err = view_std_err(&param.label);
+    match err {
         Ok(s) => HttpResponse::Ok().body(s),
-        Err(e) => HttpResponse::InternalServerError().body(format!("{:?}", e)),
+        Err(e) => HttpResponse::BadRequest().body(format!("{:?}", e)),
+    }
+}
+
+#[get("/get_yaml")]
+pub async fn get_yaml(param: Query<Label>) -> impl Responder {
+    let yaml = view_yaml(&param.label);
+    match yaml {
+        Ok(s) => HttpResponse::Ok().body(s),
+        Err(e) => HttpResponse::BadRequest().body(format!("{:?}", e)),
+    }
+}
+
+#[post("/post_yaml")]
+pub async fn post_yaml(body: String, param: Query<Label>) -> impl Responder {
+    let result = update_yaml(&body, &param.label);
+    match result {
+        Ok(_) => HttpResponse::Ok().body("Successfully updated yaml"),
+        Err(e) => HttpResponse::BadRequest().body(format!("{:?}", e)),
     }
 }

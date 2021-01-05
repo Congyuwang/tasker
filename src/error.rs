@@ -13,7 +13,7 @@ pub enum Error {
     NonUtfError(String),
     ErrorCreatingFolder(String),
     ErrorCreatingPlist(String),
-    ErrorCopyYamlToMeta(String),
+    ErrorMoveYamlToMeta(String),
     NoFileToDelete(String),
     FailedToLoadTask(String),
     FailedToUnloadTask(String),
@@ -21,4 +21,7 @@ pub enum Error {
     CommandExecutionError(String),
     FailedToReadPlistFolder(String),
     FailedToClearTempFolder(String),
+    WrongLabelInYaml(String),
+    TaskDoesNotExist(String),
+    FailedToUpdateMetaYaml(String),
 }
