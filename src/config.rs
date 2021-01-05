@@ -183,6 +183,8 @@ pub enum Config {
     KeepAlive(AliveCondition),
     RunAtLoad(bool),
     WorkingDirectory(String),
+    UserName(String),
+    GroupName(String),
     RootDirectory(String),
     ExitTimeOut(i64),
     StartInterval(i64),
