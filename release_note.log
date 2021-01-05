@@ -23,4 +23,9 @@
 [0.1.7]
     - view and modify 'yaml'
     - auto-refresh 'list' and 'list_all' every 10 seconds
-    - bug fixes: clear temp unzip folder if it exists before task creation
+    - bug fixes:
+        - clear temp unzip folder if it exists before task creation
+    - minor improvements:
+        - copy 'yaml' to trash folder before deletion
+        - clear 'out' folder after updating 'yaml'
+        - disable 'stderr', 'stdout' button if there is no output
