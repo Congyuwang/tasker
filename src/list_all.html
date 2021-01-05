@@ -51,7 +51,7 @@
                 let xhr = new XMLHttpRequest();
                 xhr.open('GET', url, true);
                 xhr.send();
-                window.location.reload()
+                load_table();
             }
         }
         function getJSON(url, callback) {
@@ -76,6 +76,15 @@
                     } else {
                         let fill_table = document.getElementById("table data"), row, label, pid, last_exit_status,
                             status, load, unload, del, stdout, stderr, yaml;
+                        let caption = document.createElement("caption");
+                        let header = document.createElement("tr");
+                        caption.innerHTML = "<b>Tasker List</b>";
+                        header.innerHTML = "<th>Label</th><th>PID</th><th>Status</th>" +
+                            "<th>Last Exit Status</th><th colspan=\"6\">Actions</th>"
+
+                        fill_table.innerHTML = "";
+                        fill_table.appendChild(caption);
+                        fill_table.appendChild(header);
                         for (let d in json_data) {
 
                             row = document.createElement("tr");
@@ -101,14 +110,6 @@
                                 row.style.textAlign = "center"
                                 row.style.justifyContent = "center"
                                 row.style.border = "1px solid #999"
-
-                                if (status_data === "ERROR") {
-                                    row.style.backgroundColor = "#ff5e5e";
-                                } else if (status_data === "NORMAL") {
-                                    row.style.backgroundColor = "#42d742";
-                                } else if (status_data === "RUNNING") {
-                                    row.style.backgroundColor = "#dbc242";
-                                }
 
                                 pid.innerHTML = pid_data;
                                 status.innerHTML = status_data;
@@ -162,8 +163,8 @@
             );
         }
         addEventListener("load", load_table);
+        setInterval(load_table, 2000);
     </script>
-    <meta http-equiv="refresh" content="10">
 </head>
 <body>
 <h1>List Tasks</h1>
@@ -172,9 +173,6 @@
         Return to Home Page
     </button>
 </form>
-<table class="table" id = "table data">
-    <caption><b>Tasker List</b></caption>
-    <tr><th>Label</th><th>PID</th><th>Status</th><th>Last Exit Status</th><th colspan="6">Actions</th></tr>
-</table>
+<table class="table" id = "table data"></table>
 </body>
 </html>
