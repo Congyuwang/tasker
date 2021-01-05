@@ -128,14 +128,16 @@ pub fn delete_task(task_label: &str) -> Result<(), Error> {
 ///
 pub fn create_task(task_zip: &Path) -> Result<(), Error> {
     let unzip_folder = Path::new(TEMP_UNZIP_FOLDER);
-    match std::fs::remove_dir_all(unzip_folder) {
-        Ok(_) => {}
-        Err(_) => {
-            return Err(Error::FailedToClearTempFolder(
-                "cannot clear folder: ".to_string() + TEMP_UNZIP_FOLDER,
-            ))
+    if unzip_folder.metadata().is_ok() {
+        match std::fs::remove_dir_all(unzip_folder) {
+            Ok(_) => {}
+            Err(_) => {
+                return Err(Error::FailedToClearTempFolder(
+                    "cannot clear folder: ".to_string() + TEMP_UNZIP_FOLDER,
+                ))
+            }
         }
-    };
+    }
     decompress(&task_zip, Path::new(TEMP_UNZIP_FOLDER))?;
     let yaml = find_yaml_file(&unzip_folder)?;
 
