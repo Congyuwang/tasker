@@ -137,9 +137,17 @@
     <button type="submit">load</button>
 </form>
 
-<h2>View YAML</h2>
+<h2>Download Task Zip</h2>
+<form onsubmit="window.open('./get_task_zip?label='+document.getElementById('yaml').value); return false;">
+    <label for="zip">download task zip</label>
+    <br><br>
+    <input id="zip" type="search" name="label" required>
+    <button type="submit">search</button>
+</form>
+
+<h2>Edit YAML</h2>
 <form onsubmit="window.open('./edit_yaml.html?label='+document.getElementById('yaml').value); return false;">
-    <label for="yaml">view output log</label>
+    <label for="yaml">edit task yaml</label>
     <br><br>
     <input id="yaml" type="search" name="label" required>
     <button type="submit">search</button>

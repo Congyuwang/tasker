@@ -1,7 +1,8 @@
 use crate::launchctl::{
-    create_task, delete_task, list, load_task, unload_task, update_yaml, view_std_err,
+    create_task, delete_task, get_zip, list, load_task, unload_task, update_yaml, view_std_err,
     view_std_out, view_yaml,
 };
+use actix_files::NamedFile;
 use actix_multipart::{Field, Multipart};
 use actix_web::body::Body;
 use actix_web::http::StatusCode;
@@ -162,5 +163,16 @@ pub async fn post_yaml(body: String, param: Query<Label>) -> impl Responder {
     match result {
         Ok(_) => HttpResponse::Ok().body("Successfully updated yaml"),
         Err(e) => HttpResponse::BadRequest().body(format!("{:?}", e)),
+    }
+}
+
+#[get("/get_task_zip")]
+pub async fn get_task_zip(param: Query<Label>) -> actix_web::Result<NamedFile> {
+    let result = get_zip(&param.label);
+    match result {
+        Ok(p) => Ok(NamedFile::open(p)?),
+        Err(e) => Err(actix_web::Error::from(
+            HttpResponse::BadRequest().body(format!("{:?}", e)),
+        )),
     }
 }

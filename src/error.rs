@@ -9,6 +9,7 @@ pub enum Error {
     LaunchctlListError(String),
     DecompressionError(String),
     RenameError(String),
+    CopyError(String),
     IllegalDomainName(String),
     NonUtfError(String),
     ErrorCreatingFolder(String),
@@ -20,7 +21,7 @@ pub enum Error {
     FailedToReplaceRootAlias(String),
     CommandExecutionError(String),
     FailedToReadMetaFolder(String),
-    FailedToClearTempFolder(String),
+    FailedToRemoveFolder(String),
     WrongLabelInYaml(String),
     TaskDoesNotExist(String),
     FailedToUpdateMetaYaml(String),
@@ -28,4 +29,6 @@ pub enum Error {
     IllegalGroupName(String),
     FailedToChown(String),
     PathDoesNotExist(String),
+    ZipFailure(String),
+    FailedToFindYamlInMeta(String),
 }

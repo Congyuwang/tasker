@@ -72,7 +72,7 @@
                         alert('Cannot get list: ' + err);
                     } else {
                         let fill_table = document.getElementById("table data"), row, label, pid, last_exit_status,
-                            status, load, unload, del, stdout, stderr, yaml;
+                            status, load, unload, del, stdout, stderr, yaml, download;
                         let caption = document.createElement("caption");
                         let header = document.createElement("tr");
                         caption.innerHTML = "<b>Tasker List</b>";
@@ -95,6 +95,7 @@
                             stdout = document.createElement("td");
                             stderr = document.createElement("td");
                             yaml = document.createElement("td");
+                            download = document.createElement("td");
 
                             if (json_data.hasOwnProperty(d)) {
 
@@ -124,6 +125,8 @@
                                     + label_data + "')\" value=\"stderr\" />";
                                 yaml.innerHTML = "<input type=\"button\" class='input' onclick=\"window.open('/edit_yaml.html?label="
                                     + label_data + "')\" value=\"yaml\" />";
+                                download.innerHTML = "<input type=\"button\" class='input' onclick=\"window.open('/get_task_zip?label="
+                                    + label_data + "')\" value=\"download\" />";
 
                                 if (status_data === "ERROR") {
                                     row.style.backgroundColor = "#ff5e5e";
@@ -144,6 +147,7 @@
                                 row.appendChild(stdout);
                                 row.appendChild(stderr);
                                 row.appendChild(yaml);
+                                row.appendChild(download);
                                 row.appendChild(load);
                                 row.appendChild(unload);
                                 row.appendChild(del);

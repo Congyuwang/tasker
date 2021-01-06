@@ -1,13 +1,14 @@
 use crate::error::Error;
 use std::ffi::CString;
 use std::fs::File;
-use std::io::Read;
+use std::io::{Read, Seek, Write};
 use std::os::macos::fs::MetadataExt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use users::{Group, User};
 use zip;
+use zip::write::FileOptions;
 
 pub fn create_dir_check<P: AsRef<Path>>(dest: P) -> Result<(), Error> {
     if std::fs::metadata(&dest).is_err() {
@@ -128,10 +129,10 @@ pub fn move_by_rename(from: &Path, to: &Path) -> Result<(), Error> {
     match move_by_rename_inner(from, to) {
         Ok(_) => Ok(()),
         Err(e) => Err(Error::RenameError(format!(
-            "error moving from {} to {}: {}",
+            "error moving from {} to {}: {:?}",
             from.display(),
             to.display(),
-            e.to_string()
+            e
         ))),
     }
 }
@@ -183,6 +184,60 @@ fn move_by_rename_inner(from: &Path, to: &Path) -> Result<(), std::io::Error> {
     }
 
     std::fs::remove_dir_all(from).unwrap();
+
+    Ok(())
+}
+
+pub fn copy_folder(from: &Path, to: &Path) -> Result<(), Error> {
+    match copy_folder_inner(from, to) {
+        Ok(_) => Ok(()),
+        Err(e) => Err(Error::CopyError(format!(
+            "error copying from {} to {}: {}",
+            from.display(),
+            to.display(),
+            e.to_string()
+        ))),
+    }
+}
+
+fn copy_folder_inner(from: &Path, to: &Path) -> Result<(), std::io::Error> {
+    create_dir_io_error(&to)?;
+    let from = std::path::Path::new(from);
+    let to = std::path::Path::new(to);
+    let mut stack = Vec::new();
+    stack.push(PathBuf::from(&from));
+
+    let output_root = PathBuf::from(&to);
+    let input_root = PathBuf::from(&from).components().count();
+
+    while let Some(working_path) = stack.pop() {
+        // relative path
+        let src: PathBuf = working_path.components().skip(input_root).collect();
+
+        // Create a destination if missing
+        let dest = if src.components().count() == 0 {
+            output_root.clone()
+        } else {
+            output_root.join(&src)
+        };
+        create_dir_io_error(&to)?;
+
+        for entry in std::fs::read_dir(working_path)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else {
+                match path.file_name() {
+                    Some(filename) => {
+                        let dest_path = dest.join(filename);
+                        std::fs::copy(&path, &dest_path)?;
+                    }
+                    None => {}
+                }
+            }
+        }
+    }
 
     Ok(())
 }
@@ -294,6 +349,73 @@ fn get_user_group_pair_id(
     }
 }
 
+fn zip_inner<T>(
+    it: &mut dyn Iterator<Item = walkdir::DirEntry>,
+    prefix: &Path,
+    writer: T,
+    method: zip::CompressionMethod,
+) -> zip::result::ZipResult<()>
+where
+    T: Write + Seek,
+{
+    let mut zip = zip::ZipWriter::new(writer);
+    let options = FileOptions::default()
+        .compression_method(method)
+        .unix_permissions(0o755);
+
+    let mut buffer = Vec::new();
+    for entry in it {
+        let path = entry.path();
+        let name = path.strip_prefix(prefix).unwrap();
+
+        if path.is_file() {
+            zip.start_file_from_path(name, options)?;
+            let mut f = File::open(path)?;
+
+            f.read_to_end(&mut buffer)?;
+            zip.write_all(&*buffer)?;
+            buffer.clear();
+        } else if name.as_os_str().len() != 0 {
+            zip.add_directory_from_path(name, options)?;
+        }
+    }
+    zip.finish()?;
+    Result::Ok(())
+}
+
+pub fn zip_dir(
+    src_dir: &Path,
+    dst_file: &Path,
+    method: zip::CompressionMethod,
+) -> Result<(), Error> {
+    if !src_dir.is_dir() {
+        return Err(Error::ZipFailure("Source Not A Directory".to_string()));
+    }
+
+    let file = File::create(dst_file).unwrap();
+
+    let walk_dir = walkdir::WalkDir::new(src_dir);
+    let it = walk_dir.into_iter();
+
+    match zip_inner(&mut it.filter_map(|e| e.ok()), src_dir, file, method) {
+        Ok(_) => Ok(()),
+        Err(_) => Err(Error::ZipFailure("failed to compress zip".to_string())),
+    }
+}
+
+pub fn try_to_remove_folder(folder_path: &Path) -> Result<(), Error> {
+    if folder_path.metadata().is_ok() {
+        return match std::fs::remove_dir_all(&folder_path) {
+            Ok(_) => Ok(()),
+            Err(_) => Err(Error::FailedToRemoveFolder(
+                "cannot clear folder: ".to_string()
+                    + folder_path.to_str().unwrap_or("unknown folder"),
+            )),
+        };
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod test_utils_mod {
 
@@ -320,26 +442,41 @@ mod test_utils_mod {
     fn chmod_test() -> Result<(), Error> {
         create_dir_and_file()?;
         std::fs::File::create("test/test_inner_1/test.txt").unwrap();
-        chown_by_name_recursive(
-            Path::new("test"),
-            &Some("Congyu WANG".to_string()),
-            &None,
-        )?;
-        // chown_by_name_recursive(
-        //     Path::new("/Users/congyuwang/Desktop/tasker_root/tasks/com.tasker.tasks.wubai"),
-        //         &Some("Congyu WANG".to_string()),
-        //     &None,
-        // )?;
+        chown_by_name_recursive(Path::new("test"), &Some("Congyu WANG".to_string()), &None)?;
         let uid = users::get_user_by_name("Congyu WANG").unwrap().uid();
         let gid = users::get_group_by_name("staff").unwrap().gid();
         assert_eq!(Path::new("test").metadata().unwrap().st_uid(), uid);
         assert_eq!(Path::new("test").metadata().unwrap().st_gid(), gid);
-        assert_eq!(Path::new("test/test_inner_1/test.txt").metadata().unwrap().st_uid(), uid);
-        assert_eq!(Path::new("test/test_inner_1/test.txt").metadata().unwrap().st_gid(), gid);
-        assert_eq!(Path::new("test/test_inner_1").metadata().unwrap().st_uid(), uid);
-        assert_eq!(Path::new("test/test_inner_1").metadata().unwrap().st_gid(), gid);
-        assert_eq!(Path::new("test/test_inner_0").metadata().unwrap().st_uid(), uid);
-        assert_eq!(Path::new("test/test_inner_0").metadata().unwrap().st_gid(), gid);
+        assert_eq!(
+            Path::new("test/test_inner_1/test.txt")
+                .metadata()
+                .unwrap()
+                .st_uid(),
+            uid
+        );
+        assert_eq!(
+            Path::new("test/test_inner_1/test.txt")
+                .metadata()
+                .unwrap()
+                .st_gid(),
+            gid
+        );
+        assert_eq!(
+            Path::new("test/test_inner_1").metadata().unwrap().st_uid(),
+            uid
+        );
+        assert_eq!(
+            Path::new("test/test_inner_1").metadata().unwrap().st_gid(),
+            gid
+        );
+        assert_eq!(
+            Path::new("test/test_inner_0").metadata().unwrap().st_uid(),
+            uid
+        );
+        assert_eq!(
+            Path::new("test/test_inner_0").metadata().unwrap().st_gid(),
+            gid
+        );
         std::fs::remove_dir_all("test").unwrap();
         Ok(())
     }

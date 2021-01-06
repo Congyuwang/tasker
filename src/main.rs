@@ -38,6 +38,7 @@ async fn main() -> std::io::Result<()> {
             .service(server::stdout_param)
             .service(server::get_yaml)
             .service(server::post_yaml)
+            .service(server::get_task_zip)
             .service(
                 web::resource("/")
                     .route(web::get().to(server::index))

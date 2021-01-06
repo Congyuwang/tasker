@@ -3,11 +3,12 @@ use crate::config::{Config, Configuration};
 use crate::error::Error;
 use crate::initialize::get_environment;
 use crate::utils::{
-    chown_by_name_recursive, create_dir_check, decompress, delete_file_check, execute_command,
-    move_by_rename, read_utf8_file,
+    chown_by_name_recursive, copy_folder, create_dir_check, decompress, delete_file_check,
+    execute_command, move_by_rename, read_utf8_file, try_to_remove_folder, zip_dir,
 };
 use crate::{
     PLIST_FOLDER, STD_ERR_FILE, STD_OUT_FILE, TASKER_TASK_NAME, TASK_ROOT_ALIAS, TEMP_UNZIP_FOLDER,
+    TEMP_ZIP_FOLDER, TEMP_ZIP_PATH,
 };
 use regex::Regex;
 use serde::Serialize;
@@ -179,16 +180,7 @@ fn try_clear_output(task_label: &str) {
 ///
 pub fn create_task(task_zip: &Path) -> Result<(), Error> {
     let unzip_folder = Path::new(TEMP_UNZIP_FOLDER);
-    if unzip_folder.metadata().is_ok() {
-        match std::fs::remove_dir_all(unzip_folder) {
-            Ok(_) => {}
-            Err(_) => {
-                return Err(Error::FailedToClearTempFolder(
-                    "cannot clear folder: ".to_string() + TEMP_UNZIP_FOLDER,
-                ))
-            }
-        }
-    }
+    try_to_remove_folder(unzip_folder)?;
     decompress(&task_zip, Path::new(TEMP_UNZIP_FOLDER))?;
     let yaml = find_yaml_file(&unzip_folder)?;
 
@@ -591,6 +583,39 @@ pub fn view_std_out(label: &str) -> Result<String, Error> {
             label, e
         ))),
     }
+}
+
+pub fn get_zip(label: &str) -> Result<PathBuf, Error> {
+    if !exist(label)? {
+        return Err(Error::TaskDoesNotExist(
+            "attempting to view yaml of non-existent tasks".to_string(),
+        ));
+    }
+    let unzip_folder = Path::new(TEMP_ZIP_FOLDER);
+    let zip_path = Path::new(TEMP_ZIP_PATH).join(label.to_string() + ".zip");
+    try_to_remove_folder(unzip_folder)?;
+    let yaml_file = get_environment()
+        .unwrap()
+        .meta_dir
+        .join(String::from(label) + ".yaml");
+
+    copy_folder(&get_task_folder_name(label), unzip_folder)?;
+
+    match std::fs::copy(
+        yaml_file.as_path(),
+        unzip_folder.join(String::from(label) + ".yaml"),
+    ) {
+        Ok(_) => {}
+        Err(_) => {
+            return Err(Error::FailedToFindYamlInMeta(
+                "task yaml missing in Meta".to_string(),
+            ))
+        }
+    };
+
+    zip_dir(unzip_folder, &zip_path, zip::CompressionMethod::Deflated)?;
+
+    Ok(zip_path)
 }
 
 impl PartialEq for TaskInfo {
