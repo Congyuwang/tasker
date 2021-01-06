@@ -190,10 +190,10 @@ fn move_by_rename_inner(from: &Path, to: &Path) -> Result<(), std::io::Error> {
 ///
 /// chown function for path
 ///
-pub fn chown_by_name(
+fn chown_by_name(
     path: &Path,
-    username: Option<String>,
-    group_name: Option<String>,
+    username: &Option<String>,
+    group_name: &Option<String>,
 ) -> Result<(), Error> {
     let (uid, gid) = get_user_group_pair_id(path, username, group_name)?;
     if let Ok(path) = CString::new(path.as_os_str().as_bytes()) {
@@ -208,19 +208,59 @@ pub fn chown_by_name(
 }
 
 ///
+/// recursively change ownership of all included file of a directory
+///
+pub fn chown_by_name_recursive(
+    path: &Path,
+    username: &Option<String>,
+    group_name: &Option<String>,
+) -> Result<(), Error> {
+    chown_by_name(path, username, group_name)?;
+    if path.is_dir() {
+        let mut stack = Vec::new();
+        stack.push(PathBuf::from(&path));
+
+        while let Some(working_path) = stack.pop() {
+            if let Ok(dir) = std::fs::read_dir(&working_path) {
+                for entry in dir {
+                    if let Ok(entry) = entry {
+                        let path = entry.path();
+                        if path.is_dir() {
+                            stack.push(PathBuf::from(&path));
+                        }
+                        chown_by_name(&path, username, group_name)?;
+                    } else {
+                        return Err(Error::FailedToChown(format!(
+                            "failed to chown entry: {}",
+                            working_path.to_str().unwrap_or("unknown path")
+                        )));
+                    }
+                }
+            } else {
+                return Err(Error::FailedToChown(format!(
+                    "{}",
+                    working_path.to_str().unwrap_or("unknown path")
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+///
 /// Convert `(user name, group name)` to `(user id, group id)` pair,
 /// and find primary group if only user is supplied.
 /// It return the original uid of the file for uid if only group is supplied.
 ///
 fn get_user_group_pair_id(
     path: &Path,
-    username: Option<String>,
-    group_name: Option<String>,
+    username: &Option<String>,
+    group_name: &Option<String>,
 ) -> Result<(u32, u32), Error> {
     if let Ok(meta) = std::fs::metadata(&path) {
         let user: Option<User> = match username {
             None => None,
-            Some(name) => match users::get_user_by_name(&name) {
+            Some(name) => match users::get_user_by_name(name) {
                 None => None,
                 Some(u) => Some(u),
             },
@@ -228,7 +268,7 @@ fn get_user_group_pair_id(
 
         let group: Option<Group> = match group_name {
             None => None,
-            Some(name) => match users::get_group_by_name(&name) {
+            Some(name) => match users::get_group_by_name(name) {
                 None => None,
                 Some(g) => Some(g),
             },

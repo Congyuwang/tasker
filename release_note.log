@@ -42,3 +42,5 @@
     - remove 'plist' after unloading
     - add 'plist' before loading
     - update yaml does not immediately load if task was unloaded
+[0.2.1]
+    - bug fixes: chown recursively all subdirectory of task folder

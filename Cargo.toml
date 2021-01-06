@@ -1,6 +1,6 @@
 [package]
 name = "tasker"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Congyuwang <116020237@link.cuhk.edu.cn>"]
 edition = "2018"
 

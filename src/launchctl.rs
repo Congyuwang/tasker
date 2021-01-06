@@ -3,7 +3,7 @@ use crate::config::{Config, Configuration};
 use crate::error::Error;
 use crate::initialize::get_environment;
 use crate::utils::{
-    chown_by_name, create_dir_check, decompress, delete_file_check, execute_command,
+    chown_by_name_recursive, create_dir_check, decompress, delete_file_check, execute_command,
     move_by_rename, read_utf8_file,
 };
 use crate::{
@@ -206,6 +206,11 @@ pub fn create_task(task_zip: &Path) -> Result<(), Error> {
         let task_folder_name = get_task_folder_name(label);
         create_dir_check(&task_folder_name)?;
         move_by_rename(&unzip_folder, task_folder_name.as_path())?;
+        chown_by_name_recursive(
+            task_folder_name.as_path(),
+            &config.get_user_name(),
+            &config.get_group_name(),
+        )?;
 
         // place plist and load task
         place_plist_and_load(&config)
@@ -326,10 +331,10 @@ fn process_config(mut config: Configuration) -> Result<Configuration, Error> {
     create_dir_check(&task_output_name)?;
 
     // chown for out directory
-    chown_by_name(
-        &task_output_name,
-        config.get_user_name(),
-        config.get_group_name(),
+    chown_by_name_recursive(
+        task_output_name.as_path(),
+        &config.get_user_name(),
+        &config.get_group_name(),
     )?;
 
     let mut temp;
