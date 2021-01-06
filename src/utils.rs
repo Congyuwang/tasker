@@ -293,3 +293,54 @@ fn get_user_group_pair_id(
         )))
     }
 }
+
+#[cfg(test)]
+mod test_utils_mod {
+
+    use super::*;
+
+    fn create_dir_and_file() -> Result<(), Error> {
+        create_dir_check("test")?;
+        create_dir_check("test/test_inner_0")?;
+        create_dir_check("test/test_inner_1")?;
+
+        let mut dir_vec = Vec::new();
+        for d in Path::new("test").read_dir().unwrap() {
+            let d = d.unwrap();
+            dir_vec.push(d);
+        }
+
+        Ok(())
+    }
+
+    ///
+    /// this test only pass with root user
+    ///
+    #[test]
+    fn chmod_test() -> Result<(), Error> {
+        create_dir_and_file()?;
+        std::fs::File::create("test/test_inner_1/test.txt").unwrap();
+        chown_by_name_recursive(
+            Path::new("test"),
+            &Some("Congyu WANG".to_string()),
+            &None,
+        )?;
+        // chown_by_name_recursive(
+        //     Path::new("/Users/congyuwang/Desktop/tasker_root/tasks/com.tasker.tasks.wubai"),
+        //         &Some("Congyu WANG".to_string()),
+        //     &None,
+        // )?;
+        let uid = users::get_user_by_name("Congyu WANG").unwrap().uid();
+        let gid = users::get_group_by_name("staff").unwrap().gid();
+        assert_eq!(Path::new("test").metadata().unwrap().st_uid(), uid);
+        assert_eq!(Path::new("test").metadata().unwrap().st_gid(), gid);
+        assert_eq!(Path::new("test/test_inner_1/test.txt").metadata().unwrap().st_uid(), uid);
+        assert_eq!(Path::new("test/test_inner_1/test.txt").metadata().unwrap().st_gid(), gid);
+        assert_eq!(Path::new("test/test_inner_1").metadata().unwrap().st_uid(), uid);
+        assert_eq!(Path::new("test/test_inner_1").metadata().unwrap().st_gid(), gid);
+        assert_eq!(Path::new("test/test_inner_0").metadata().unwrap().st_uid(), uid);
+        assert_eq!(Path::new("test/test_inner_0").metadata().unwrap().st_gid(), gid);
+        std::fs::remove_dir_all("test").unwrap();
+        Ok(())
+    }
+}

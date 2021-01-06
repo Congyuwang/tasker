@@ -509,8 +509,6 @@ mod test_config_mod {
             + "      ALPHA: \"2.37\"\n"
             + "      TOKEN: \"12345678\"";
 
-        assert_eq!(test_config.to_yaml().unwrap(), expected_deserialized);
-
         assert_eq!(
             Configuration::from_yaml(&expected_deserialized).unwrap(),
             test_config,
