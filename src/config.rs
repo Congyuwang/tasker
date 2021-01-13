@@ -216,11 +216,11 @@ impl Config {
                 Ok(Config::StartCalendarInterval(new_cals))
             }
             Config::ExitTimeOut(t) => {
-                check_range_return_err!(ExitTimeOut, t, 0, i64::MAX);
+                check_range_return_err!(ExitTimeOut, t, 1, i64::MAX);
                 Ok(Config::ExitTimeOut(t))
             }
             Config::StartInterval(t) => {
-                check_range_return_err!(StartInterval, t, 0, i64::MAX);
+                check_range_return_err!(StartInterval, t, 1, i64::MAX);
                 Ok(Config::StartInterval(t))
             }
             Config::WorkingDirectory(p) => {
