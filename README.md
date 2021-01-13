@@ -264,6 +264,24 @@ Working directory for the path.
 
 ⚠️Requirement: must point to a valid (existing) directory.
 
+### `~root~/` Alias
+
+Use `~root~/` in `ProgramArguments` to refer to the files in the task's zip file uploaded.
+
+#### Example
+
+Refer to a python script in the zip file uploaded:
+
+```{yml}
+---
+Label: test2
+Program: /usr/bin/python
+Configuration:
+  - ProgramArguments:
+      - /usr/bin/python
+      - ~root~/some_script.py
+```
+
 ## Notes
 
 1. ⚠️IMPORTANT! For security concern, always use SSL encryption and username+password for remote visiting of `Tasker`⚠️. The webpage uses Basic Http Authentication, which is safe only under HTTPS connection.
