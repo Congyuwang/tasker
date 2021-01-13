@@ -1,10 +1,10 @@
 # Tasker
 
-`Tasker` is a rust program for `MacOS` that provides an easy web user interface for publishing tasks in `launchd`. It enables remote management of MacOS tasks.
+`Tasker` is a rust program for `macOS` that provides an easy web user interface for publishing tasks in `launchd`. It enables remote management of macOS tasks.
 
 ## Usage
 
-Must run with `root` priviledge! Command `sudo ./rust` or set as a task in `/Library/LaunchDaemons`.
+Must run with `root` privilege! Command `sudo ./rust` or set as a task in `/Library/LaunchDaemons`.
 
 ## Environmental Variables
 
@@ -128,9 +128,9 @@ Configuration:
 
 Possible Optional configurations include (some are omitted):
 
-#### `RunAtLoad`: boolean
+#### `RunAtLoad` boolean
 
-If this is true, the task will run immediately after been loaded.
+If this is true, the task will run immediately after being loaded.
 
 Example: 
 ```{yml}
@@ -145,11 +145,11 @@ Configuration:
 
 ⚠️Requirement: must either be `true` or `false`
 
-#### `StartCalendarInterval`: array of calendar intervals
+#### `StartCalendarInterval` array of calendar intervals
 
 ##### Example 1
 
-start at 8am everyday:
+start at 8am every day:
 ```{yml}
 ---
 Label: test2
@@ -197,7 +197,7 @@ Possible time parameters: `Minute`, `Hour`, `Weekday`, `Day`, `Month`
 
 #### `UserName`: string
 
-Run this task with a particular user of the MacOS system, related to priviledges of file system. If this filed is missing, the task run with `root` user.
+Run this task with a particular user of the macOS system. If this filed is missing, the task run with `root` user.
 
 Example: 
 ```{yml}
@@ -214,7 +214,7 @@ Configuration:
 
 #### `GroupName`: string
 
-Similar to `UserName`, run this task with priviledge of the specified group.
+Similar to `UserName`, run this task with privilege of the specified group.
 
 Note: When `GroupName` is missing, the system automatically chooses the primary user of the group as username.
 
@@ -222,15 +222,15 @@ Note: When `GroupName` is missing, the system automatically chooses the primary 
 
 #### `KeepAlive`: dict
 
-Conditions for keeping the task running. Currently there are 2 options available:
+Conditions for keeping the task running. Currently, there are 2 options available:
 
 - SuccessfulExit: boolean
 - Crashed: boolean
 
 Explanation:
 
-- If `SuccessfulExit` is set to `true`, the task will rerun after successful exit with return code 0.
-- If `SuccessfulExit` is set to `false`, the task will rerun after failed exit with non-0 return code.
+- If `SuccessfulExit` is set to `true`, the task will rerun after a successful exit with return code 0.
+- If `SuccessfulExit` is set to `false`, the task will rerun after a failed exit with non-0 return code.
 - If `Crashed` is set to `true`, the task will rerun if the task is exited due to a signal which is typically associated with a crash (SIGILL, SIGSEGV, etc.).
 - If `Crashed` is set to `false`, the task will rerun if the task is **NOT** exited due to a signal which is typically associated with a crash (SIGILL, SIGSEGV, etc.).
 
@@ -260,7 +260,7 @@ Configuration:
 
 #### `WorkingDirectory`: string
 
-Working directory for the path.
+The working directory for the task.
 
 ⚠️Requirement: must point to a valid (existing) directory.
 
