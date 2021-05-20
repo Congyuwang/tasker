@@ -130,11 +130,19 @@ pub async fn unload_param(param: Query<Label>) -> impl Responder {
     }
 }
 
+fn plain_html(s: String) -> String {
+    format!(
+        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\">\
+    <title>VIEW OUTPUT</title></head><body>{}</body></html>",
+        s.replace("\n", "<br>")
+    )
+}
+
 #[get("/stdout")]
 pub async fn stdout_param(param: Query<Label>) -> impl Responder {
     let out = view_std_out(&param.label);
     match out {
-        Ok(s) => HttpResponse::Ok().body(s),
+        Ok(s) => HttpResponse::Ok().body(plain_html(s)),
         Err(e) => HttpResponse::BadRequest().body(format!("{:?}", e)),
     }
 }
@@ -143,7 +151,7 @@ pub async fn stdout_param(param: Query<Label>) -> impl Responder {
 pub async fn stderr_param(param: Query<Label>) -> impl Responder {
     let err = view_std_err(&param.label);
     match err {
-        Ok(s) => HttpResponse::Ok().body(s),
+        Ok(s) => HttpResponse::Ok().body(plain_html(s)),
         Err(e) => HttpResponse::BadRequest().body(format!("{:?}", e)),
     }
 }
