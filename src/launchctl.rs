@@ -1,4 +1,4 @@
-use crate::config::Config::ProgramArguments;
+use crate::config::Config::{ProgramArguments, RootDirectory, WorkingDirectory};
 use crate::config::{Config, Configuration};
 use crate::error::Error;
 use crate::initialize::get_environment;
@@ -278,6 +278,21 @@ pub fn update_yaml(yaml_content: &str, this_label: &str) -> Result<(), Error> {
     Ok(())
 }
 
+fn replace_root_alias(path: &mut String, task_folder: &PathBuf) -> Result<(), Error> {
+    if path.starts_with(TASK_ROOT_ALIAS) {
+        let alias_removed = path.replacen(TASK_ROOT_ALIAS, "", 1);
+        let alias_replaced = task_folder.join(alias_removed);
+        if let Some(new_path) = alias_replaced.to_str() {
+            *path = new_path.to_string();
+        } else {
+            return Err(Error::FailedToReplaceRootAlias(
+                "failed to replace root folder, do not use non-utf-8 character in path".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 ///
 /// this function replaces ROOT_ALIAS to root folder for each task
 ///
@@ -287,22 +302,27 @@ fn replace_task_root_alias(config: &mut Configuration, task_label: &str) -> Resu
     for conf in configuration {
         if let ProgramArguments(arguments) = conf {
             for arg in arguments {
-                if arg.starts_with(TASK_ROOT_ALIAS) {
-                    let path_removed_alias = arg.replacen(TASK_ROOT_ALIAS, "", 1);
-                    let alias_replaced = task_folder.join(path_removed_alias);
-                    if let Some(new_arg) = alias_replaced.to_str() {
-                        *arg = new_arg.to_string();
-                    } else {
-                        return Err(Error::FailedToReplaceRootAlias(
-                            "failed to replace root folder, do not use non-utf-8 character in path"
-                                .to_string(),
-                        ));
-                    }
-                }
+                replace_root_alias(arg, &task_folder)?;
             }
+        } else if let WorkingDirectory(working_directory) = conf {
+            replace_root_alias(working_directory, &task_folder)?;
+        } else if let RootDirectory(working_directory) = conf {
+            replace_root_alias(working_directory, &task_folder)?;
         }
     }
     Ok(())
+}
+
+fn set_working_directory_as_root_alias(config: Configuration) -> Configuration {
+    for c in &config.configuration {
+        match c {
+            WorkingDirectory(_) => {
+                return config;
+            }
+            __ => {}
+        }
+    }
+    config.add_config(WorkingDirectory(TASK_ROOT_ALIAS.to_owned()))
 }
 
 ///
@@ -313,6 +333,8 @@ fn replace_task_root_alias(config: &mut Configuration, task_label: &str) -> Resu
 ///
 fn process_config(mut config: Configuration) -> Result<Configuration, Error> {
     let label = &config.label.clone();
+
+    config = set_working_directory_as_root_alias(config);
 
     // replace root alias
     replace_task_root_alias(&mut config, label)?;
@@ -346,6 +368,7 @@ fn process_config(mut config: Configuration) -> Result<Configuration, Error> {
             "non-utf8 character not supported in stdout/stderr path".to_string(),
         ));
     }
+
     Ok(temp)
 }
 

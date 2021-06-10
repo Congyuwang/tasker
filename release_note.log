@@ -4,7 +4,7 @@
     - delete 'out' folder when deleting tasks.
     - add '/unload' and '/load'.
 [0.1.2]
-    - add '{root}' alias in program arguments.
+    - add '~root~' alias in program arguments.
     - check load status for 'load' and 'unload'
     - unload loaded task before covering with 'create'
 [0.1.3]
@@ -46,3 +46,6 @@
     - bug fixes: chown recursively all subdirectory of 'task' folder
 [0.2.2]
     - add 'download' function to download task zip package
+[0.2.3]
+    - allow 'RootDirectory' and 'WorkingDirectory' to use '~root~' alias
+    - set '~root~' as default working directory
