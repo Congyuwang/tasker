@@ -4,11 +4,12 @@ use crate::error::Error;
 use crate::initialize::get_environment;
 use crate::utils::{
     chown_by_name_recursive, copy_folder, create_dir_check, decompress, delete_file_check,
-    execute_command, move_by_rename, read_utf8_file, try_to_remove_folder, zip_dir,
+    execute_command, move_by_rename, read_last_n_lines, read_utf8_file, try_to_remove_folder,
+    zip_dir,
 };
 use crate::{
-    PLIST_FOLDER, STD_ERR_FILE, STD_OUT_FILE, TASKER_TASK_NAME, TASK_ROOT_ALIAS, TEMP_UNZIP_FOLDER,
-    TEMP_ZIP_FOLDER, TEMP_ZIP_PATH,
+    MAX_OUTPUT_LINE, PLIST_FOLDER, STD_ERR_FILE, STD_OUT_FILE, TASKER_TASK_NAME, TASK_ROOT_ALIAS,
+    TEMP_UNZIP_FOLDER, TEMP_ZIP_FOLDER, TEMP_ZIP_PATH,
 };
 use regex::Regex;
 use serde::Serialize;
@@ -588,7 +589,7 @@ pub fn view_yaml(label: &str) -> Result<String, Error> {
 
 pub fn view_std_err(label: &str) -> Result<String, Error> {
     let std_err_file = get_output_folder_name(label).join(STD_ERR_FILE);
-    match read_utf8_file(std_err_file.as_path()) {
+    match read_last_n_lines(std_err_file.as_path(), MAX_OUTPUT_LINE) {
         Ok(s) => Ok(s),
         Err(e) => Err(Error::NonUtfError(format!(
             "task `{}` has not been created or its stderr has not been created: {:?}",
@@ -599,7 +600,7 @@ pub fn view_std_err(label: &str) -> Result<String, Error> {
 
 pub fn view_std_out(label: &str) -> Result<String, Error> {
     let std_out_file = get_output_folder_name(label).join(STD_OUT_FILE);
-    match read_utf8_file(std_out_file.as_path()) {
+    match read_last_n_lines(std_out_file.as_path(), MAX_OUTPUT_LINE) {
         Ok(s) => Ok(s),
         Err(e) => Err(Error::NonUtfError(format!(
             "task `{}` has not been created or its stdout has not been created: {:?}",

@@ -1,7 +1,9 @@
 use crate::error::Error;
+use std::collections::VecDeque;
 use std::ffi::CString;
 use std::fs::File;
-use std::io::{Read, Seek, Write};
+use std::io::{BufRead, BufReader, Read, Seek, Write};
+use std::iter::FromIterator;
 use std::os::macos::fs::MetadataExt;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -120,6 +122,24 @@ pub fn read_utf8_file(file: &Path) -> std::io::Result<String> {
     let mut utf8_string = String::new();
     file.read_to_string(&mut utf8_string)?;
     Ok(utf8_string)
+}
+
+pub fn read_last_n_lines(file: &Path, n: usize) -> std::io::Result<String> {
+    let file = File::open(file)?;
+    let lines = BufReader::new(file).lines();
+    let mut lines_queue = VecDeque::with_capacity(n + 1);
+    for line in lines {
+        match line {
+            Ok(l) => {
+                lines_queue.push_back(l);
+            }
+            Err(e) => return Err(std::io::Error::from(e)),
+        }
+        if lines_queue.len() > n {
+            let _ = lines_queue.pop_front();
+        }
+    }
+    Ok(Vec::from_iter(lines_queue).join("\n"))
 }
 
 ///
