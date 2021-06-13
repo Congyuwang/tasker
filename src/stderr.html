@@ -104,7 +104,7 @@
         function replaceQueryParam(param, new_val, search) {
             let regex = new RegExp("([?;&])" + param + "[^&;]*[;&]?");
             let query = search.replace(regex, "$1").replace(/&$/, '');
-            return (query.length > 2 ? query + "&" : "?") + (new_val ? param + "=" + encodeURIComponent(new_val) : '');
+            return (query.length > 2 ? query + "&" : "?") + param + "=" + encodeURIComponent(new_val);
         }
     </script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
