@@ -120,9 +120,9 @@
                                 del.innerHTML = "<input type=\"button\" class='input dangerous' onclick=\"verify('/delete?label="
                                     + label_data + "', '" + label_data + "')\" value=\"delete\" />";
                                 stdout.innerHTML = "<input type=\"button\" class='input' onclick=\"window.open('/stdout.html?label="
-                                    + label_data + "')\" value=\"stdout\" />";
+                                    + label_data + "&filter=&limit=30')\" value=\"stdout\" />";
                                 stderr.innerHTML = "<input type=\"button\" class='input' onclick=\"window.open('/stderr.html?label="
-                                    + label_data + "')\" value=\"stderr\" />";
+                                    + label_data + "&filter=&limit=30')\" value=\"stderr\" />";
                                 yaml.innerHTML = "<input type=\"button\" class='input' onclick=\"window.open('/edit_yaml.html?label="
                                     + label_data + "')\" value=\"yaml\" />";
                                 download.innerHTML = "<input type=\"button\" class='input' onclick=\"window.open('/get_task_zip?label="

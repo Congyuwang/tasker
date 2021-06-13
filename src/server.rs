@@ -22,6 +22,7 @@ static EDIT_YAML: &'static str = include_str!("edit_yaml.html");
 static STDOUT: &'static str = include_str!("stdout.html");
 static STDERR: &'static str = include_str!("stderr.html");
 static MB_LIMIT: usize = 20;
+static MAX_OUTPUT_LIMIT: usize = 5000;
 static SIZE_LIMIT: usize = MB_LIMIT * 1024 * 1024;
 static TEMP_ZIP: &str = "/tmp/tasker.task.temp.zip";
 
@@ -109,6 +110,7 @@ pub struct Label {
 pub struct OutputLimited {
     label: String,
     limit: usize,
+    filter: String,
 }
 
 #[get("/list_raw_json")]
@@ -147,7 +149,7 @@ pub async fn unload_param(param: Query<Label>) -> impl Responder {
     }
 }
 
-fn plain_text_response(s: Result<String, Error>) -> impl Responder {
+fn plain_text_response(s: Result<String, Error>) -> HttpResponse {
     match s {
         Ok(s) => HttpResponse::Ok().body(s.replace("\n", "<br>")),
         Err(e) => HttpResponse::BadRequest().body(format!("{:?}", e)),
@@ -156,13 +158,25 @@ fn plain_text_response(s: Result<String, Error>) -> impl Responder {
 
 #[get("/stdout_raw")]
 pub async fn stdout_param(param: Query<OutputLimited>) -> impl Responder {
-    let out = view_std_out(&param.label, param.limit);
+    if param.limit < 1 || param.limit > MAX_OUTPUT_LIMIT {
+        return HttpResponse::BadRequest().body(format!(
+            "limit should be between 1 and {:}",
+            MAX_OUTPUT_LIMIT
+        ));
+    }
+    let out = view_std_out(&param.label, param.limit, &param.filter);
     plain_text_response(out)
 }
 
 #[get("/stderr_raw")]
 pub async fn stderr_param(param: Query<OutputLimited>) -> impl Responder {
-    let err = view_std_err(&param.label, param.limit);
+    if param.limit < 1 || param.limit > MAX_OUTPUT_LIMIT {
+        return HttpResponse::BadRequest().body(format!(
+            "limit should be between 1 and {:}",
+            MAX_OUTPUT_LIMIT
+        ));
+    }
+    let err = view_std_err(&param.label, param.limit, &param.filter);
     plain_text_response(err)
 }
 

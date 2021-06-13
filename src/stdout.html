@@ -23,12 +23,57 @@
     </style>
     <script>
         let interval = 1000;
-        let limit = 30;
+        let url = new URL(location.href);
+        let label = url.searchParams.get("label");
+        let limit = url.searchParams.get("limit");
+        let filter = url.searchParams.get("filter");
+        function isInt(str) {
+            if (typeof str != "string") return false
+            return !isNaN(str) &&
+                !isNaN(parseFloat(str)) &&
+                Number.isInteger(parseFloat(str))
+        }
+        function update_limit_param(new_limit) {
+            let str = window.location.search;
+            str = replaceQueryParam('limit', new_limit, str);
+            window.location = window.location.pathname + str;
+        }
+        function update_filter_param(new_filter) {
+            let str = window.location.search;
+            str = replaceQueryParam('filter', new_filter, str);
+            window.location = window.location.pathname + str;
+        }
+        function change_limit_to(new_limit) {
+            update_limit_param(new_limit);
+            load_stdout();
+        }
+        function refresh_filter(new_filter) {
+            update_filter_param(new_filter);
+            load_stdout();
+        }
         function load_stdout() {
-            let url = new URL(location.href);
-            let label = url.searchParams.get("label");
+            limit = url.searchParams.get("limit");
+            filter = url.searchParams.get("filter");
+            if (!isInt(limit)) {
+                alert("illegal limit parameter, reset to 30");
+                update_limit_param(30);
+                limit = 30;
+                document.getElementById('change_limit').value = limit;
+            }
+            limit = parseInt(limit);
+            if (limit < 1) {
+                alert("there should be at least 1 line, change limit to 1");
+                update_limit_param(1);
+                limit = 1
+                document.getElementById('change_limit').value = limit;
+            } else if (limit > 1000) {
+                alert("largest lines of output is 1000, change limit to 1000");
+                update_limit_param(1000);
+                limit = 1000;
+                document.getElementById('change_limit').value = limit;
+            }
             let xhr = new XMLHttpRequest();
-            xhr.open('GET', "/stdout_raw?label=" + label + "&limit=" + limit, true);
+            xhr.open('GET', "/stdout_raw?label=" + label + "&limit=" + limit + "&filter=" + encodeURIComponent(filter), true);
             xhr.responseType = "text"
             xhr.onload = function() {
                 if (xhr.status === 200) {
@@ -39,7 +84,12 @@
             }
             xhr.send();
         }
-        addEventListener("load", load_stdout);
+        function first_load() {
+            load_stdout()
+            document.getElementById('change_limit').value = limit;
+            document.getElementById('update_filter').value = filter;
+        }
+        addEventListener("load", first_load);
         let intervalID = setInterval(load_stdout, interval);
         function pause_update() {
             clearInterval(intervalID);
@@ -51,27 +101,10 @@
             document.getElementById("pause_button").disabled = false;
             document.getElementById("continue_button").disabled = true;
         }
-        function isInt(str) {
-            if (typeof str != "string") return false
-            return !isNaN(str) &&
-                !isNaN(parseFloat(str)) &&
-                Number.isInteger(parseFloat(str))
-        }
-        function change_limit_to(new_limit) {
-            if (!isInt(new_limit)) {
-                alert("enter an integer please");
-                return;
-            }
-            new_limit = parseInt(new_limit);
-            if (new_limit < 1) {
-                alert("there should be at least 1 line");
-                return;
-            } else if (new_limit > 10000) {
-                alert("largest lines of output is 10000");
-                return;
-            }
-            limit = new_limit;
-            load_stdout();
+        function replaceQueryParam(param, new_val, search) {
+            let regex = new RegExp("([?;&])" + param + "[^&;]*[;&]?");
+            let query = search.replace(regex, "$1").replace(/&$/, '');
+            return (query.length > 2 ? query + "&" : "?") + (new_val ? param + "=" + encodeURIComponent(new_val) : '');
         }
     </script>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -81,11 +114,17 @@
 <h2 class="h2">CONTROLS</h2>
 <form onsubmit="change_limit_to(document.getElementById('change_limit').value); return false;">
     <label for="change_limit">MAXIMUM NUMBER OF LINES</label>
-    <input id="change_limit" type="text" name="label" value="30" required>
+    <input id="change_limit" type="text" value="30" required>
     <button type="submit">change</button>
     <button onclick="pause_update()" id="pause_button">pause update</button>
     <button onclick="continue_update()" id="continue_button">continue update</button>
     <script>document.getElementById("continue_button").disabled = true;</script>
+</form>
+<h2 class="h2">FILTER</h2>
+<form onsubmit="refresh_filter(document.getElementById('update_filter').value); return false;">
+    <label for="update_filter">FILTER LOG LINES</label>
+    <input id="update_filter" type="text">
+    <button type="submit">filter</button>
 </form>
 <h2>LOG CONTENT</h2>
 <div id="stdout"></div>

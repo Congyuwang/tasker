@@ -587,9 +587,9 @@ pub fn view_yaml(label: &str) -> Result<String, Error> {
     }
 }
 
-pub fn view_std_err(label: &str, limit: usize) -> Result<String, Error> {
+pub fn view_std_err(label: &str, limit: usize, pattern: &str) -> Result<String, Error> {
     let std_err_file = get_output_folder_name(label).join(STD_ERR_FILE);
-    match read_last_n_lines(std_err_file.as_path(), limit) {
+    match read_last_n_lines(std_err_file.as_path(), limit, pattern) {
         Ok(s) => Ok(s),
         Err(e) => Err(Error::NonUtfError(format!(
             "task `{}` has not been created or its stderr has not been created: {:?}",
@@ -598,9 +598,9 @@ pub fn view_std_err(label: &str, limit: usize) -> Result<String, Error> {
     }
 }
 
-pub fn view_std_out(label: &str, limit: usize) -> Result<String, Error> {
+pub fn view_std_out(label: &str, limit: usize, pattern: &str) -> Result<String, Error> {
     let std_out_file = get_output_folder_name(label).join(STD_OUT_FILE);
-    match read_last_n_lines(std_out_file.as_path(), limit) {
+    match read_last_n_lines(std_out_file.as_path(), limit, pattern) {
         Ok(s) => Ok(s),
         Err(e) => Err(Error::NonUtfError(format!(
             "task `{}` has not been created or its stdout has not been created: {:?}",
@@ -679,7 +679,7 @@ impl TaskInfo {
             status = Status::RUNNING
         } else if last_exit_status.unwrap() != 0 {
             status = Status::ERROR
-        } else if view_std_out(&label, 1).is_err() {
+        } else if !get_output_folder_name(&label).join(STD_OUT_FILE).exists() {
             status = Status::LOADED
         }
         TaskInfo {

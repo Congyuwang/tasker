@@ -124,14 +124,16 @@ pub fn read_utf8_file(file: &Path) -> std::io::Result<String> {
     Ok(utf8_string)
 }
 
-pub fn read_last_n_lines(file: &Path, n: usize) -> std::io::Result<String> {
+pub fn read_last_n_lines(file: &Path, n: usize, pattern: &str) -> std::io::Result<String> {
     let file = File::open(file)?;
     let lines = BufReader::new(file).lines();
     let mut lines_queue = VecDeque::with_capacity(n + 1);
     for line in lines {
         match line {
             Ok(l) => {
-                lines_queue.push_back(l);
+                if l.contains(pattern) {
+                    lines_queue.push_back(l);
+                }
             }
             Err(e) => return Err(std::io::Error::from(e)),
         }
