@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>STDERR</title>
+    <style>
+        h1 {
+            background-color: #e2fdb3;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            text-align: center;
+        }
+        h2 {
+            background-color: #e2fdb3;
+            display: flex;
+            flex-direction: row;
+            justify-content: center;
+        }
+        form {
+            text-align: center;
+        }
+    </style>
+    <script>
+        let interval = 5000;
+        let limit = 30;
+        function load_stderr() {
+            let url = new URL(location.href);
+            let label = url.searchParams.get("label");
+            let xhr = new XMLHttpRequest();
+            xhr.open('GET', "/stderr_raw?label=" + label + "&limit=" + limit, true);
+            xhr.responseType = "text"
+            xhr.onload = function() {
+                if (xhr.status === 200) {
+                    document.getElementById("stderr").innerHTML = xhr.responseText
+                } else {
+                    alert("failed to load stderr: " + xhr.status + ":" + xhr.responseText)
+                }
+            }
+            xhr.send();
+        }
+        addEventListener("load", load_stderr);
+        let intervalID = setInterval(load_stderr, interval);
+        function pause_update() {
+            clearInterval(intervalID);
+            document.getElementById("pause_button").disabled = true;
+            document.getElementById("continue_button").disabled = false;
+        }
+        function continue_update() {
+            intervalID = setInterval(load_stderr, interval);
+            document.getElementById("pause_button").disabled = false;
+            document.getElementById("continue_button").disabled = true;
+        }
+        function isInt(str) {
+            if (typeof str != "string") return false
+            return !isNaN(str) &&
+                !isNaN(parseFloat(str)) &&
+                Number.isInteger(parseFloat(str))
+        }
+        function change_limit_to(new_limit) {
+            if (!isInt(new_limit)) {
+                alert("enter an integer please");
+                return;
+            }
+            new_limit = parseInt(new_limit);
+            if (new_limit < 1) {
+                alert("there should be at least 1 line");
+                return;
+            } else if (new_limit > 10000) {
+                alert("largest lines of output is 10000");
+                return;
+            }
+            limit = new_limit;
+            load_stderr();
+        }
+    </script>
+</head>
+<body>
+<h1>STDERR</h1>
+<h2 class="h2">CONTROLS</h2>
+    <form onsubmit="change_limit_to(document.getElementById('change_limit').value); return false;">
+        <label for="change_limit">MAXIMUM NUMBER OF LINES</label>
+        <input id="change_limit" type="text" name="label" value="30" required>
+        <button type="submit">change</button>
+        <button onclick="pause_update()" id="pause_button">pause update</button>
+        <button onclick="continue_update()" id="continue_button">continue update</button>
+        <script>document.getElementById("continue_button").disabled = true;</script>
+    </form>
+<h2>LOG CONTENT</h2>
+<div id="stderr"></div>
+</body>
+</html>

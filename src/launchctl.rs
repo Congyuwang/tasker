@@ -8,8 +8,8 @@ use crate::utils::{
     zip_dir,
 };
 use crate::{
-    MAX_OUTPUT_LINE, PLIST_FOLDER, STD_ERR_FILE, STD_OUT_FILE, TASKER_TASK_NAME, TASK_ROOT_ALIAS,
-    TEMP_UNZIP_FOLDER, TEMP_ZIP_FOLDER, TEMP_ZIP_PATH,
+    PLIST_FOLDER, STD_ERR_FILE, STD_OUT_FILE, TASKER_TASK_NAME, TASK_ROOT_ALIAS, TEMP_UNZIP_FOLDER,
+    TEMP_ZIP_FOLDER, TEMP_ZIP_PATH,
 };
 use regex::Regex;
 use serde::Serialize;
@@ -587,9 +587,9 @@ pub fn view_yaml(label: &str) -> Result<String, Error> {
     }
 }
 
-pub fn view_std_err(label: &str) -> Result<String, Error> {
+pub fn view_std_err(label: &str, limit: usize) -> Result<String, Error> {
     let std_err_file = get_output_folder_name(label).join(STD_ERR_FILE);
-    match read_last_n_lines(std_err_file.as_path(), MAX_OUTPUT_LINE) {
+    match read_last_n_lines(std_err_file.as_path(), limit) {
         Ok(s) => Ok(s),
         Err(e) => Err(Error::NonUtfError(format!(
             "task `{}` has not been created or its stderr has not been created: {:?}",
@@ -598,9 +598,9 @@ pub fn view_std_err(label: &str) -> Result<String, Error> {
     }
 }
 
-pub fn view_std_out(label: &str) -> Result<String, Error> {
+pub fn view_std_out(label: &str, limit: usize) -> Result<String, Error> {
     let std_out_file = get_output_folder_name(label).join(STD_OUT_FILE);
-    match read_last_n_lines(std_out_file.as_path(), MAX_OUTPUT_LINE) {
+    match read_last_n_lines(std_out_file.as_path(), limit) {
         Ok(s) => Ok(s),
         Err(e) => Err(Error::NonUtfError(format!(
             "task `{}` has not been created or its stdout has not been created: {:?}",
@@ -679,7 +679,7 @@ impl TaskInfo {
             status = Status::RUNNING
         } else if last_exit_status.unwrap() != 0 {
             status = Status::ERROR
-        } else if view_std_out(&label).is_err() {
+        } else if view_std_out(&label, 1).is_err() {
             status = Status::LOADED
         }
         TaskInfo {

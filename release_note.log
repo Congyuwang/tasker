@@ -50,3 +50,4 @@
     - allow 'RootDirectory' and 'WorkingDirectory' to use '~root~' alias
     - set '~root~' as default working directory
     - limit max lines of stdout/stderr display to 'MAX_OUTPUT_LINE'.
+    - automatically update content of webpage.

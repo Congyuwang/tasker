@@ -47,6 +47,8 @@ async fn main() -> std::io::Result<()> {
             .service(web::resource("/list_all").route(web::get().to(server::list_all)))
             .service(web::resource("/list_part.html").route(web::get().to(server::list_part)))
             .service(web::resource("/edit_yaml.html").route(web::get().to(server::edit_yaml)))
+            .service(web::resource("/stderr.html").route(web::get().to(server::stderr)))
+            .service(web::resource("/stdout.html").route(web::get().to(server::stdout)))
             .service(server::list_raw_json)
     });
 

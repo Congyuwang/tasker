@@ -1,3 +1,4 @@
+use crate::error::Error;
 use crate::launchctl::{
     create_task, delete_task, get_zip, list, load_task, unload_task, update_yaml, view_std_err,
     view_std_out, view_yaml,
@@ -18,6 +19,8 @@ static LIST_ALL_HTML: &'static str = include_str!("list_all.html");
 static LIST_PART_HTML: &'static str = include_str!("list_part.html");
 static CREATE_SUCCESS: &'static str = include_str!("create_success.html");
 static EDIT_YAML: &'static str = include_str!("edit_yaml.html");
+static STDOUT: &'static str = include_str!("stdout.html");
+static STDERR: &'static str = include_str!("stderr.html");
 static MB_LIMIT: usize = 20;
 static SIZE_LIMIT: usize = MB_LIMIT * 1024 * 1024;
 static TEMP_ZIP: &str = "/tmp/tasker.task.temp.zip";
@@ -40,6 +43,14 @@ pub fn create_success() -> HttpResponse {
 
 pub fn edit_yaml() -> HttpResponse {
     HttpResponse::Ok().body(EDIT_YAML)
+}
+
+pub fn stderr() -> HttpResponse {
+    HttpResponse::Ok().body(STDERR)
+}
+
+pub fn stdout() -> HttpResponse {
+    HttpResponse::Ok().body(STDOUT)
 }
 
 ///
@@ -94,6 +105,12 @@ pub struct Label {
     label: String,
 }
 
+#[derive(Deserialize)]
+pub struct OutputLimited {
+    label: String,
+    limit: usize,
+}
+
 #[get("/list_raw_json")]
 pub async fn list_raw_json(param: Query<Label>) -> impl Responder {
     let list_result = list(&param.label);
@@ -130,30 +147,23 @@ pub async fn unload_param(param: Query<Label>) -> impl Responder {
     }
 }
 
-fn plain_html(s: String) -> String {
-    format!(
-        "<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"UTF-8\">\
-    <title>VIEW OUTPUT</title></head><body>{}</body></html>",
-        s.replace("\n", "<br>")
-    )
-}
-
-#[get("/stdout")]
-pub async fn stdout_param(param: Query<Label>) -> impl Responder {
-    let out = view_std_out(&param.label);
-    match out {
-        Ok(s) => HttpResponse::Ok().body(plain_html(s)),
+fn plain_text_response(s: Result<String, Error>) -> impl Responder {
+    match s {
+        Ok(s) => HttpResponse::Ok().body(s.replace("\n", "<br>")),
         Err(e) => HttpResponse::BadRequest().body(format!("{:?}", e)),
     }
 }
 
-#[get("/stderr")]
-pub async fn stderr_param(param: Query<Label>) -> impl Responder {
-    let err = view_std_err(&param.label);
-    match err {
-        Ok(s) => HttpResponse::Ok().body(plain_html(s)),
-        Err(e) => HttpResponse::BadRequest().body(format!("{:?}", e)),
-    }
+#[get("/stdout_raw")]
+pub async fn stdout_param(param: Query<OutputLimited>) -> impl Responder {
+    let out = view_std_out(&param.label, param.limit);
+    plain_text_response(out)
+}
+
+#[get("/stderr_raw")]
+pub async fn stderr_param(param: Query<OutputLimited>) -> impl Responder {
+    let err = view_std_err(&param.label, param.limit);
+    plain_text_response(err)
 }
 
 #[get("/get_yaml")]
