@@ -1,7 +1,7 @@
 use crate::config::Config::{ProgramArguments, RootDirectory, WorkingDirectory};
 use crate::config::{Config, Configuration};
 use crate::error::Error;
-use crate::initialize::get_environment;
+use crate::initialize::Env;
 use crate::utils::{
     chown_by_name_recursive, copy_folder, create_dir_check, decompress, delete_file_check,
     execute_command, move_by_rename, read_last_n_lines, read_utf8_file, try_to_remove_folder,
@@ -18,6 +18,10 @@ use std::collections::BTreeSet;
 use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+lazy_static! {
+    static ref LABEL_REGEX: Regex = Regex::new("^(.+)\\.yaml$").unwrap();
+}
 
 #[derive(Debug, Serialize)]
 pub enum Status {
@@ -41,15 +45,15 @@ fn get_plist_path(label_name: &str) -> PathBuf {
 }
 
 fn get_task_folder_name(label_name: &str) -> PathBuf {
-    get_environment().unwrap().task_dir.join(label_name)
+    Env::get().task_dir.join(label_name)
 }
 
 fn get_output_folder_name(label_name: &str) -> PathBuf {
-    get_environment().unwrap().out_dir.join(label_name)
+    Env::get().out_dir.join(label_name)
 }
 
 fn get_trash_folder_name(label_name: &str) -> PathBuf {
-    get_environment().unwrap().trash_dir.join(label_name)
+    Env::get().trash_dir.join(label_name)
 }
 
 ///
@@ -136,10 +140,7 @@ pub fn delete_task(task_label: &str) -> Result<(), Error> {
     };
 
     // move yaml to trash
-    let yaml_in_meta = get_environment()
-        .unwrap()
-        .meta_dir
-        .join(String::from(task_label) + ".yaml");
+    let yaml_in_meta = Env::get().meta_dir.join(String::from(task_label) + ".yaml");
     if let Some(file_name) = yaml_in_meta.file_name() {
         match std::fs::copy(
             &yaml_in_meta,
@@ -379,8 +380,7 @@ fn process_config(mut config: Configuration) -> Result<Configuration, Error> {
 fn move_yaml_to_meta(yaml: &PathBuf, label: &String) -> Result<(), Error> {
     match std::fs::copy(
         &yaml,
-        get_environment()
-            .unwrap()
+        Env::get()
             .meta_dir
             .join(String::from(label) + ".yaml")
             .as_path(),
@@ -403,8 +403,7 @@ fn move_yaml_to_meta(yaml: &PathBuf, label: &String) -> Result<(), Error> {
 
 fn update_yaml_in_meta(yaml_content: &str, label: &String) -> Result<(), Error> {
     match std::fs::write(
-        get_environment()
-            .unwrap()
+        Env::get()
             .meta_dir
             .join(String::from(label) + ".yaml")
             .as_path(),
@@ -518,10 +517,7 @@ fn launchctl_list(label_pattern: &str) -> Result<BTreeSet<TaskInfo>, Error> {
 /// convert it into a vector of `TaskInfo`
 ///
 fn meta_yaml_list(label_pattern: &str) -> Result<Vec<TaskInfo>, Error> {
-    lazy_static! {
-        static ref LABEL_REGEX: Regex = Regex::new("^(.+)\\.yaml$").unwrap();
-    }
-    let meta_directory = &get_environment().unwrap().meta_dir;
+    let meta_directory = &Env::get().meta_dir;
     if let Ok(dir) = meta_directory.read_dir() {
         let mut tasks: Vec<TaskInfo> = Vec::new();
         for file in dir {
@@ -574,10 +570,7 @@ pub fn view_yaml(label: &str) -> Result<String, Error> {
             "attempting to view yaml of non-existent tasks".to_string(),
         ));
     }
-    let yaml_file = get_environment()
-        .unwrap()
-        .meta_dir
-        .join(String::from(label) + ".yaml");
+    let yaml_file = Env::get().meta_dir.join(String::from(label) + ".yaml");
     match read_utf8_file(yaml_file.as_path()) {
         Ok(s) => Ok(s),
         Err(e) => Err(Error::NonUtfError(format!(
@@ -618,10 +611,7 @@ pub fn get_zip(label: &str) -> Result<PathBuf, Error> {
     let unzip_folder = Path::new(TEMP_ZIP_FOLDER);
     let zip_path = Path::new(TEMP_ZIP_PATH).join(label.to_string() + ".zip");
     try_to_remove_folder(unzip_folder)?;
-    let yaml_file = get_environment()
-        .unwrap()
-        .meta_dir
-        .join(String::from(label) + ".yaml");
+    let yaml_file = Env::get().meta_dir.join(String::from(label) + ".yaml");
 
     copy_folder(&get_task_folder_name(label), unzip_folder)?;
 

@@ -3,20 +3,15 @@ use actix_web::{middleware, web, App, HttpResponse, HttpServer};
 use actix_web_httpauth::extractors::basic::BasicAuth;
 use actix_web_httpauth::middleware::HttpAuthentication;
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
-use tasker::{initialize::get_environment, server};
+use tasker::{initialize::Env, server};
 
 async fn validator(
     req: ServiceRequest,
     _credentials: BasicAuth,
 ) -> Result<ServiceRequest, actix_web::Error> {
-    if _credentials
-        .user_id()
-        .eq(&get_environment().unwrap().user_name)
+    if _credentials.user_id().eq(&Env::get().user_name)
         && _credentials.password().is_some()
-        && _credentials
-            .password()
-            .unwrap()
-            .eq(&get_environment().unwrap().password)
+        && _credentials.password().unwrap().eq(&Env::get().password)
     {
         Ok(req)
     } else {
@@ -52,7 +47,7 @@ async fn main() -> std::io::Result<()> {
             .service(server::list_raw_json)
     });
 
-    let env = get_environment().unwrap();
+    let env = Env::get();
     if let (Some(pk), Some(crt)) = (&env.pk_dir, &env.crt_dir) {
         let mut builder = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
         builder
@@ -61,10 +56,8 @@ async fn main() -> std::io::Result<()> {
         builder
             .set_certificate_chain_file(crt)
             .expect("ssl crt file error");
-        app.bind_openssl(get_environment().unwrap().address(), builder)?
-            .run()
-            .await
+        app.bind_openssl(Env::get().address(), builder)?.run().await
     } else {
-        app.bind(get_environment().unwrap().address())?.run().await
+        app.bind(Env::get().address())?.run().await
     }
 }

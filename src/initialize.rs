@@ -17,20 +17,14 @@ pub struct Env {
     pub password: String,
 }
 
-static mut ENVIRONMENT: Option<Env> = None;
 static META_FOLDER: &str = "meta";
 static TASK_FOLDER: &str = "tasks";
 static TRASH_FOLDER: &str = "trash";
 static OUT_FOLDER: &str = "out";
 static DOMAIN_RE: &str = "^[A-Za-z0-9]{1,63}(\\.[A-Za-z0-9]{1,63})*$";
-
-pub fn get_environment() -> Option<&'static Env> {
-    unsafe {
-        if ENVIRONMENT.is_none() {
-            ENVIRONMENT = Some(Env::init());
-        }
-        return ENVIRONMENT.as_ref();
-    }
+lazy_static! {
+    static ref ENVIRONMENT: Env = Env::init();
+    static ref DOMAIN_REGEX: Regex = Regex::new(DOMAIN_RE).unwrap();
 }
 
 impl Env {
@@ -104,9 +98,6 @@ impl Env {
     /// The domain name part should not start or end with dash (-) (e.g. -google-.com)
     /// The domain name part should be between 1 and 63 characters long
     fn check_domain_name(domain: &str) -> Result<&str, Error> {
-        lazy_static! {
-            static ref DOMAIN_REGEX: Regex = Regex::new(DOMAIN_RE).unwrap();
-        }
         if DOMAIN_REGEX.is_match(domain) {
             Ok(domain)
         } else {
@@ -118,5 +109,9 @@ impl Env {
 
     pub fn address(&self) -> String {
         format!("{}:{}", &self.domain, &self.port)
+    }
+
+    pub fn get() -> &'static Env {
+        return &ENVIRONMENT;
     }
 }
